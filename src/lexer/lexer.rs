@@ -1,7 +1,5 @@
 use std::fmt::Display;
 
-use anyhow::Result;
-
 #[allow(dead_code)]
 #[derive(Debug, PartialEq)]
 pub enum Token {
@@ -81,7 +79,41 @@ impl Lexer {
         self.read_position += 1;
     }
 
+    pub fn look_up_ident(&mut self, ident: String) -> Token {
+        return match ident.as_str() {
+            "fn" => Token::Function,
+            "let" => Token::Let,
+            _ => Token::Ident(ident),
+        };
+    }
+
+    fn read_indetifier(&mut self) -> String {
+        let position = self.position;
+        while self.ch.is_ascii_alphabetic() {
+            self.read_char();
+        }
+        let buf = &self.input[position..=self.position];
+        return String::from_utf8_lossy(buf).into_owned();
+    }
+
+    fn skip_whitespace(&mut self) {
+        if self.ch.is_ascii_whitespace() {
+            self.read_char();
+        }
+    }
+
+    fn read_number(&mut self) -> String {
+        let position = self.position;
+        while self.ch.is_ascii_digit() {
+            self.read_char();
+        }
+        let buf = &self.input[position..=self.position];
+        return String::from_utf8_lossy(buf).to_string();
+    }
+
     pub fn next_token(&mut self) -> Token {
+        self.skip_whitespace();
+
         let token = match self.ch {
             b'=' => Token::Assign,
             b';' => Token::Semicolon,
@@ -91,9 +123,19 @@ impl Lexer {
             b'+' => Token::Plus,
             b'{' => Token::LBrace,
             b'}' => Token::RBrace,
-            b'0' => Token::EOF,
+            0 => Token::EOF,
+            b'a'..=b'z' | b'A'..=b'Z' | b'_' => {
+                let ident: String = self.read_indetifier();
+                return self.look_up_ident(ident);
+            }
+            b'0'..=b'9' => {
+                let ident: String = self.read_number();
+                return Token::Int(ident);
+            }
+
             _ => Token::Illegal,
         };
+
         self.read_char();
         return token;
     }
