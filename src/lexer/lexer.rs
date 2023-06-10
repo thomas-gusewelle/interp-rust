@@ -92,12 +92,12 @@ impl Lexer {
         while self.ch.is_ascii_alphabetic() {
             self.read_char();
         }
-        let buf = &self.input[position..=self.position];
+        let buf = &self.input[position..self.position];
         return String::from_utf8_lossy(buf).into_owned();
     }
 
     fn skip_whitespace(&mut self) {
-        if self.ch.is_ascii_whitespace() {
+        while self.ch.is_ascii_whitespace() {
             self.read_char();
         }
     }
@@ -107,7 +107,7 @@ impl Lexer {
         while self.ch.is_ascii_digit() {
             self.read_char();
         }
-        let buf = &self.input[position..=self.position];
+        let buf = &self.input[position..self.position];
         return String::from_utf8_lossy(buf).to_string();
     }
 
@@ -133,7 +133,10 @@ impl Lexer {
                 return Token::Int(ident);
             }
 
-            _ => Token::Illegal,
+            _ => {
+                println!("char: {:?}", self.ch as char);
+                Token::Illegal
+            }
         };
 
         self.read_char();
@@ -149,17 +152,51 @@ mod tests {
 
     #[test]
     fn test_next_token() -> Result<()> {
-        let input = "=+(){},;";
+        let input = r#"let five = 5;
+            let ten = 10;
+            let add = fn(x, y) {
+                x + y;
+            };
+            let result = add(five, ten);
+            "#;
         let mut lexer = Lexer::new(input.into());
 
         let tokens = vec![
+            Token::Let,
+            Token::Ident("five".to_string()),
             Token::Assign,
-            Token::Plus,
+            Token::Int("5".to_string()),
+            Token::Semicolon,
+            Token::Let,
+            Token::Ident(String::from("ten")),
+            Token::Assign,
+            Token::Int(String::from("10")),
+            Token::Semicolon,
+            Token::Let,
+            Token::Ident(String::from("add")),
+            Token::Assign,
+            Token::Function,
             Token::LParen,
+            Token::Ident(String::from("x")),
+            Token::Comma,
+            Token::Ident(String::from("y")),
             Token::RParen,
             Token::LBrace,
+            Token::Ident(String::from("x")),
+            Token::Plus,
+            Token::Ident(String::from("y")),
+            Token::Semicolon,
             Token::RBrace,
+            Token::Semicolon,
+            Token::Let,
+            Token::Ident(String::from("result")),
+            Token::Assign,
+            Token::Ident(String::from("add")),
+            Token::LParen,
+            Token::Ident(String::from("five")),
             Token::Comma,
+            Token::Ident(String::from("ten")),
+            Token::RParen,
             Token::Semicolon,
         ];
 
