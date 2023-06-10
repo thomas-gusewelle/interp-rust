@@ -95,61 +95,6 @@ impl Lexer {
         return lex;
     }
 
-    pub fn read_char(&mut self) {
-        if self.read_position >= self.input.len() {
-            self.ch = 0;
-        } else {
-            self.ch = self.input[self.read_position]
-        }
-        self.position = self.read_position;
-        self.read_position += 1;
-    }
-
-    pub fn look_up_ident(&mut self, ident: String) -> Token {
-        return match ident.as_str() {
-            "fn" => Token::Function,
-            "let" => Token::Let,
-            "return" => Token::Return,
-            "if" => Token::If,
-            "else" => Token::Else,
-            "true" => Token::True,
-            "false" => Token::False,
-            _ => Token::Ident(ident),
-        };
-    }
-
-    fn read_indetifier(&mut self) -> String {
-        let position = self.position;
-        while self.ch.is_ascii_alphabetic() {
-            self.read_char();
-        }
-        let buf = &self.input[position..self.position];
-        return String::from_utf8_lossy(buf).into_owned();
-    }
-
-    fn skip_whitespace(&mut self) {
-        while self.ch.is_ascii_whitespace() {
-            self.read_char();
-        }
-    }
-
-    fn read_number(&mut self) -> String {
-        let position = self.position;
-        while self.ch.is_ascii_digit() {
-            self.read_char();
-        }
-        let buf = &self.input[position..self.position];
-        return String::from_utf8_lossy(buf).to_string();
-    }
-
-    fn peek_char(&mut self) -> u8 {
-        if self.read_position >= self.input.len() {
-            return 0;
-        } else {
-            return self.input[self.read_position];
-        }
-    }
-
     pub fn next_token(&mut self) -> Token {
         self.skip_whitespace();
 
@@ -200,6 +145,61 @@ impl Lexer {
 
         self.read_char();
         return token;
+    }
+
+    fn read_char(&mut self) {
+        if self.read_position >= self.input.len() {
+            self.ch = 0;
+        } else {
+            self.ch = self.input[self.read_position]
+        }
+        self.position = self.read_position;
+        self.read_position += 1;
+    }
+
+    fn look_up_ident(&mut self, ident: String) -> Token {
+        return match ident.as_str() {
+            "fn" => Token::Function,
+            "let" => Token::Let,
+            "return" => Token::Return,
+            "if" => Token::If,
+            "else" => Token::Else,
+            "true" => Token::True,
+            "false" => Token::False,
+            _ => Token::Ident(ident),
+        };
+    }
+
+    fn read_indetifier(&mut self) -> String {
+        let position = self.position;
+        while self.ch.is_ascii_alphabetic() {
+            self.read_char();
+        }
+        let buf = &self.input[position..self.position];
+        return String::from_utf8_lossy(buf).into_owned();
+    }
+
+    fn skip_whitespace(&mut self) {
+        while self.ch.is_ascii_whitespace() {
+            self.read_char();
+        }
+    }
+
+    fn read_number(&mut self) -> String {
+        let position = self.position;
+        while self.ch.is_ascii_digit() {
+            self.read_char();
+        }
+        let buf = &self.input[position..self.position];
+        return String::from_utf8_lossy(buf).to_string();
+    }
+
+    fn peek_char(&mut self) -> u8 {
+        if self.read_position >= self.input.len() {
+            return 0;
+        } else {
+            return self.input[self.read_position];
+        }
     }
 }
 
