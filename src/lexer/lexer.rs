@@ -17,6 +17,8 @@ pub enum Token {
     Slash,
     GreaterThan,
     LessThan,
+    Equal,
+    NotEqual,
 
     Comma,
     Semicolon,
@@ -29,6 +31,7 @@ pub enum Token {
     Function,
     Let,
     If,
+    Else,
     Return,
     True,
     False,
@@ -51,6 +54,8 @@ impl Display for Token {
             Token::Slash => write!(f, "Slash"),
             Token::GreaterThan => write!(f, "GreaterThan"),
             Token::LessThan => write!(f, "LessThan"),
+            Token::Equal => write!(f, "Equal"),
+            Token::NotEqual => write!(f, "Not Equal"),
 
             Token::Comma => write!(f, "Commma"),
             Token::Semicolon => write!(f, "Semicolin"),
@@ -63,6 +68,7 @@ impl Display for Token {
             Token::Function => write!(f, "Function"),
             Token::Let => write!(f, "Let"),
             Token::If => write!(f, "If"),
+            Token::Else => write!(f, "Else"),
             Token::Return => write!(f, "Return"),
             Token::True => write!(f, "True"),
             Token::False => write!(f, "False"),
@@ -105,6 +111,7 @@ impl Lexer {
             "let" => Token::Let,
             "return" => Token::Return,
             "if" => Token::If,
+            "else" => Token::Else,
             "true" => Token::True,
             "false" => Token::False,
             _ => Token::Ident(ident),
@@ -135,11 +142,26 @@ impl Lexer {
         return String::from_utf8_lossy(buf).to_string();
     }
 
+    fn peek_char(&mut self) -> u8 {
+        if self.read_position >= self.input.len() {
+            return 0;
+        } else {
+            return self.input[self.read_position];
+        }
+    }
+
     pub fn next_token(&mut self) -> Token {
         self.skip_whitespace();
 
         let token = match self.ch {
-            b'=' => Token::Assign,
+            b'=' => {
+                if self.peek_char() == b'=' {
+                    self.read_char();
+                    Token::Equal
+                } else {
+                    Token::Assign
+                }
+            }
             b';' => Token::Semicolon,
             b'(' => Token::LParen,
             b')' => Token::RParen,
@@ -147,7 +169,14 @@ impl Lexer {
             b'+' => Token::Plus,
             b'{' => Token::LBrace,
             b'}' => Token::RBrace,
-            b'!' => Token::Bang,
+            b'!' => {
+                if self.peek_char() == b'=' {
+                    self.read_char();
+                    Token::NotEqual
+                } else {
+                    Token::Bang
+                }
+            }
             b'-' => Token::Minus,
             b'*' => Token::Asterisk,
             b'/' => Token::Slash,
@@ -196,6 +225,8 @@ mod tests {
             } else {
             return false;
 }
+10 == 10;
+10 != 9;
             "#;
         let mut lexer = Lexer::new(input.into());
 
@@ -247,6 +278,31 @@ mod tests {
             Token::Int(String::from("10")),
             Token::GreaterThan,
             Token::Int(String::from("5")),
+            Token::Semicolon,
+            Token::If,
+            Token::LParen,
+            Token::Int(String::from("5")),
+            Token::LessThan,
+            Token::Int(String::from("10")),
+            Token::RParen,
+            Token::LBrace,
+            Token::Return,
+            Token::True,
+            Token::Semicolon,
+            Token::RBrace,
+            Token::Else,
+            Token::LBrace,
+            Token::Return,
+            Token::False,
+            Token::Semicolon,
+            Token::RBrace,
+            Token::Int(String::from("10")),
+            Token::Equal,
+            Token::Int(String::from("10")),
+            Token::Semicolon,
+            Token::Int(String::from("10")),
+            Token::NotEqual,
+            Token::Int(String::from("9")),
             Token::Semicolon,
         ];
 
