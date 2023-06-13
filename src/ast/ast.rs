@@ -24,9 +24,20 @@ pub struct Let {
     pub value: Expression,
 }
 
+impl Let {
+    pub fn new(token: Token, name: Identifier, value: Expression) -> Let {
+        Let { token, name, value }
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub struct Identifier {
     pub token: Token,
+}
+impl Identifier {
+    pub fn new(token: Token) -> Identifier {
+        Identifier { token }
+    }
 }
 
 #[derive(Debug, PartialEq)]

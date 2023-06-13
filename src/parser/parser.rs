@@ -1,9 +1,8 @@
-use std::error::Error;
-
 use crate::{
-    ast::ast::Program,
+    ast::ast::{Identifier, Let, Program, Statement},
     lexer::lexer::{Lexer, Token},
 };
+use anyhow::{anyhow, Result};
 
 pub struct Parser {
     lexer: Lexer,
@@ -24,12 +23,62 @@ impl Parser {
         return parser;
     }
     pub fn parse_program(&mut self) -> Option<Program> {
-        return None;
+        let mut statements: Vec<Statement> = Vec::new();
+        while self.current_token != Token::EOF {
+            statements.push(self.parse_statement())
+        }
+        return Some(Program::new(statements));
     }
 
     fn next_token(&mut self) {
         self.current_token = self.peek_token.clone();
         self.peek_token = self.lexer.next_token();
+    }
+    fn parse_statement(&mut self) -> Statement {
+        match self.current_token {
+            Token::Let => {
+                let inside = self.parse_let_statement().unwrap();
+                return Statement::Let(inside);
+            }
+            _ => todo!(),
+        }
+    }
+    fn parse_let_statement(&mut self) -> Result<Let> {
+        if !self.expect_peek(Token::Ident(String::new())) {
+            return Err(anyhow!("Wrong token type"));
+        }
+
+        let identifier = Identifier::new(self.current_token.clone());
+
+        if !self.expect_peek(Token::Assign) {
+            return Err(anyhow!("Expected token of Assign"));
+        }
+
+        while !self.current_token_is(Token::Semicolon) {
+            self.next_token();
+        }
+
+        return Ok(Let::new(
+            self.current_token.clone(),
+            identifier,
+            crate::ast::ast::Expression {},
+        ));
+    }
+
+    fn current_token_is(&mut self, t: Token) -> bool {
+        return self.current_token == t;
+    }
+    fn peek_token_is(&mut self, t: Token) -> bool {
+        return self.current_token == t;
+    }
+
+    fn expect_peek(&mut self, t: Token) -> bool {
+        if self.peek_token_is(t) {
+            self.next_token();
+            return true;
+        } else {
+            return false;
+        }
     }
 }
 
