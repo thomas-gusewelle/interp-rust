@@ -29,6 +29,7 @@ impl Parser {
                 println!("{:?}", s);
                 statements.push(s);
             };
+            self.next_token();
         }
         return Some(Program::new(statements));
     }
@@ -43,10 +44,9 @@ impl Parser {
                 let inside = self.parse_let_statement().unwrap();
                 return Some(Statement::Let(inside));
             }
-            _ => {
-                self.next_token();
-                None
-            }
+            // calls self.next_token to move the token forward when it is not a let statment. This is because
+            // the funciton is not fully done.
+            _ => None,
         }
     }
     fn parse_let_statement(&mut self) -> Result<Let> {
