@@ -25,7 +25,10 @@ impl Parser {
     pub fn parse_program(&mut self) -> Option<Program> {
         let mut statements: Vec<Statement> = Vec::new();
         while self.current_token != Token::EOF {
-            statements.push(self.parse_statement())
+            if let Some(s) = self.parse_statement() {
+                println!("{:?}", s);
+                statements.push(s);
+            };
         }
         return Some(Program::new(statements));
     }
@@ -34,20 +37,23 @@ impl Parser {
         self.current_token = self.peek_token.clone();
         self.peek_token = self.lexer.next_token();
     }
-    fn parse_statement(&mut self) -> Statement {
+    fn parse_statement(&mut self) -> Option<Statement> {
         match self.current_token {
             Token::Let => {
                 let inside = self.parse_let_statement().unwrap();
-                return Statement::Let(inside);
+                return Some(Statement::Let(inside));
             }
-            _ => todo!(),
+            _ => {
+                self.next_token();
+                None
+            }
         }
     }
     fn parse_let_statement(&mut self) -> Result<Let> {
         if !self.expect_peek(Token::Ident(String::new())) {
             return Err(anyhow!("Wrong token type"));
         }
-
+        let ident_token = self.current_token.clone();
         let identifier = Identifier::new(self.current_token.clone());
 
         if !self.expect_peek(Token::Assign) {
@@ -55,21 +61,22 @@ impl Parser {
         }
 
         while !self.current_token_is(Token::Semicolon) {
+            println!("Token: {:?}", self.current_token);
             self.next_token();
         }
 
         return Ok(Let::new(
-            self.current_token.clone(),
+            ident_token,
             identifier,
             crate::ast::ast::Expression {},
         ));
     }
 
     fn current_token_is(&mut self, t: Token) -> bool {
-        return self.current_token == t;
+        std::mem::discriminant(&self.current_token) == std::mem::discriminant(&t)
     }
     fn peek_token_is(&mut self, t: Token) -> bool {
-        return self.current_token == t;
+        std::mem::discriminant(&self.peek_token) == std::mem::discriminant(&t)
     }
 
     fn expect_peek(&mut self, t: Token) -> bool {
@@ -95,13 +102,14 @@ mod tests {
     use super::Parser;
     #[test]
     fn test_let_statment() -> Result<()> {
+        println!("here 101");
         let input = r#"
         let x = 5;
         let y = 10;
         let foobar = 838383;
         "#;
 
-        let mut lexer = Lexer::new(input.into());
+        let lexer = Lexer::new(input.into());
         let mut parser = Parser::new(lexer);
 
         let program = parser.parse_program().unwrap();
@@ -115,6 +123,7 @@ mod tests {
             Token::Ident(String::from("foobar")),
         ];
         for (i, ident) in expected_idents.into_iter().enumerate() {
+            println!("Here 123");
             let statment = &program.statements[i];
             match statment {
                 Statement::Let(x) => {
