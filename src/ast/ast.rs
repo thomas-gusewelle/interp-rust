@@ -3,7 +3,7 @@ use crate::lexer::lexer::Token;
 #[derive(Debug, PartialEq)]
 pub enum Statement {
     Let(Let),
-    Return,
+    Return(Return),
 }
 
 #[derive(Debug, PartialEq)]
@@ -27,6 +27,20 @@ pub struct Let {
 impl Let {
     pub fn new(token: Token, name: Identifier, value: Expression) -> Let {
         Let { token, name, value }
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Return {
+    pub token: Token,
+    pub return_value: Expression,
+}
+impl Return {
+    pub fn new(token: Token, return_value: Expression) -> Return {
+        Return {
+            token,
+            return_value,
+        }
     }
 }
 

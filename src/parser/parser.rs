@@ -1,5 +1,5 @@
 use crate::{
-    ast::ast::{Identifier, Let, Program, Statement},
+    ast::ast::{Expression, Identifier, Let, Program, Return, Statement},
     lexer::lexer::{Lexer, Token},
 };
 use anyhow::{anyhow, Result};
@@ -44,6 +44,9 @@ impl Parser {
                 let inside = self.parse_let_statement().unwrap();
                 return Some(Statement::Let(inside));
             }
+            Token::Return => {
+                return Some(self.parse_return_statement().unwrap());
+            }
             // calls self.next_token to move the token forward when it is not a let statment. This is because
             // the funciton is not fully done.
             _ => None,
@@ -72,6 +75,19 @@ impl Parser {
         ));
     }
 
+    fn parse_return_statement(&mut self) -> Result<Statement> {
+        let token = self.current_token.clone();
+
+        self.next_token();
+
+        // TODO: Skipping expressions for now
+        while !self.current_token_is(Token::Semicolon) {
+            self.next_token();
+        }
+        let return_inside = Return::new(token, Expression {});
+        Ok(Statement::Return(return_inside))
+    }
+
     fn current_token_is(&mut self, t: Token) -> bool {
         std::mem::discriminant(&self.current_token) == std::mem::discriminant(&t)
     }
@@ -92,10 +108,12 @@ impl Parser {
 #[cfg(test)]
 mod tests {
 
-    use anyhow::{anyhow, Result};
+    use std::any;
+
+    use anyhow::{anyhow, Ok, Result};
 
     use crate::{
-        ast::ast::Statement,
+        ast::ast::{Return, Statement},
         lexer::lexer::{Lexer, Token},
     };
 
@@ -132,6 +150,34 @@ mod tests {
                 _ => todo!(),
             }
         }
+        Ok(())
+    }
+    #[test]
+    fn test_return_statement() -> Result<()> {
+        let input: Vec<u8> = r#"
+            return 5;
+            return 10;
+            return 993322;
+            "#
+        .into();
+
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+
+        let program = parser.parse_program().unwrap();
+
+        if program.statements.len() != 3 {
+            return Err(anyhow!("wrong number of statements"));
+        };
+        program.statements.into_iter().for_each(|stmt| {
+            assert_eq!(
+                std::mem::discriminant(&stmt),
+                std::mem::discriminant(&Statement::Return(Return::new(
+                    Token::Return,
+                    crate::ast::ast::Expression {}
+                )))
+            );
+        });
         Ok(())
     }
 }
