@@ -1,13 +1,13 @@
 use std::fmt::Display;
 
 #[allow(dead_code)]
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Eq, Hash)]
 pub enum Token {
     Illegal,
     EOF,
 
     Ident(String),
-    Int(String),
+    Int(usize),
 
     Assign,
     Plus,
@@ -133,8 +133,7 @@ impl Lexer {
                 return self.look_up_ident(ident);
             }
             b'0'..=b'9' => {
-                let ident: String = self.read_number();
-                return Token::Int(ident);
+                return Token::Int(self.read_number());
             }
 
             _ => {
@@ -185,13 +184,14 @@ impl Lexer {
         }
     }
 
-    fn read_number(&mut self) -> String {
+    fn read_number(&mut self) -> usize {
         let position = self.position;
         while self.ch.is_ascii_digit() {
             self.read_char();
         }
         let buf = &self.input[position..self.position];
-        return String::from_utf8_lossy(buf).to_string();
+        let string = String::from_utf8_lossy(buf).to_string();
+        string.parse().unwrap()
     }
 
     fn peek_char(&mut self) -> u8 {
@@ -234,12 +234,12 @@ mod tests {
             Token::Let,
             Token::Ident("five".to_string()),
             Token::Assign,
-            Token::Int("5".to_string()),
+            Token::Int(5),
             Token::Semicolon,
             Token::Let,
             Token::Ident(String::from("ten")),
             Token::Assign,
-            Token::Int(String::from("10")),
+            Token::Int(10),
             Token::Semicolon,
             Token::Let,
             Token::Ident(String::from("add")),
@@ -271,19 +271,19 @@ mod tests {
             Token::Minus,
             Token::Slash,
             Token::Asterisk,
-            Token::Int(String::from("5")),
+            Token::Int(5),
             Token::Semicolon,
-            Token::Int(String::from("5")),
+            Token::Int(5),
             Token::LessThan,
-            Token::Int(String::from("10")),
+            Token::Int(10),
             Token::GreaterThan,
-            Token::Int(String::from("5")),
+            Token::Int(5),
             Token::Semicolon,
             Token::If,
             Token::LParen,
-            Token::Int(String::from("5")),
+            Token::Int(5),
             Token::LessThan,
-            Token::Int(String::from("10")),
+            Token::Int(10),
             Token::RParen,
             Token::LBrace,
             Token::Return,
@@ -296,13 +296,13 @@ mod tests {
             Token::False,
             Token::Semicolon,
             Token::RBrace,
-            Token::Int(String::from("10")),
+            Token::Int(10),
             Token::Equal,
-            Token::Int(String::from("10")),
+            Token::Int(10),
             Token::Semicolon,
-            Token::Int(String::from("10")),
+            Token::Int(10),
             Token::NotEqual,
-            Token::Int(String::from("9")),
+            Token::Int(9),
             Token::Semicolon,
         ];
 

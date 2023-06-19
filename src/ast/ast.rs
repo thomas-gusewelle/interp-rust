@@ -4,6 +4,13 @@ use crate::lexer::lexer::Token;
 pub enum Statement {
     Let(Let),
     Return(Return),
+    Expression(Expression),
+}
+#[derive(Debug, PartialEq)]
+pub enum Expression {
+    Identifier(Token),
+    Intiger(Token),
+    Prefix,
 }
 
 #[derive(Debug, PartialEq)]
@@ -44,6 +51,17 @@ impl Return {
     }
 }
 
+// #[derive(Debug, PartialEq, Clone)]
+// pub struct Expression {
+//     pub token: Token,
+// }
+//
+// impl Expression {
+//     pub fn new(token: Token) -> Expression {
+//         Expression { token }
+//     }
+// }
+
 #[derive(Debug, PartialEq)]
 pub struct Identifier {
     pub token: Token,
@@ -53,6 +71,3 @@ impl Identifier {
         Identifier { token }
     }
 }
-
-#[derive(Debug, PartialEq)]
-pub struct Expression {}
