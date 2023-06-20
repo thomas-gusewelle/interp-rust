@@ -11,6 +11,7 @@ pub enum Expression {
     Identifier(Token),
     Integer(Token),
     Prefix(Box<PrefixExpression>),
+    Infix,
 }
 
 #[derive(Debug, PartialEq)]

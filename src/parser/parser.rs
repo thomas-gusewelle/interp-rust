@@ -16,6 +16,22 @@ pub enum Precidence {
     Call,
 }
 
+impl From<&Token> for Precidence {
+    fn from(token: &Token) -> Self {
+        match token {
+            Token::Equal => Precidence::Equals,
+            Token::NotEqual => Precidence::Equals,
+            Token::LessThan => Precidence::LessGreater,
+            Token::GreaterThan => Precidence::LessGreater,
+            Token::Plus => Precidence::Sum,
+            Token::Minus => Precidence::Sum,
+            Token::Slash => Precidence::Product,
+            Token::Asterisk => Precidence::Product,
+            _ => Precidence::Lowest,
+        }
+    }
+}
+
 type PrefixParseFn = Result<Expression>;
 type InfixParseFn = fn(Expression) -> Result<Expression>;
 
@@ -148,33 +164,33 @@ impl Parser {
     }
 
     fn parse_expression(&mut self, precidence: Precidence) -> Result<Expression> {
-        match self.current_token {
-            Token::Ident(_) => Ok(Expression::Identifier(self.current_token.clone())),
-            Token::Int(_) => Ok(Expression::Integer(self.current_token.clone())),
-            Token::Bang | Token::Minus => {
-                let token = self.current_token.clone();
-                self.next_token();
-                let right = self.parse_expression(Precidence::Prefix).unwrap();
-
-                Ok(Expression::Prefix(Box::new(PrefixExpression::new(
-                    token, right,
-                ))))
-            }
-            _ => Err(anyhow!("unknown token type in parse_expression")),
+        let expression = match precidence {
+            Precidence::Lowest | Precidence::Prefix => match self.current_token {
+                Token::Ident(_) => Ok(Expression::Identifier(self.current_token.clone())),
+                Token::Int(_) => Ok(Expression::Integer(self.current_token.clone())),
+                Token::Bang | Token::Minus => self.parse_prefix(),
+                _ => Err(anyhow!("Unknown token type")),
+            },
+            _ => Err(anyhow!("Unkown precidence type")),
+        };
+        while !self.peek_token_is(Token::Semicolon) && precidence < self.peek_precedence() {
+            unimplemented!();
         }
+        expression
     }
 
-    // fn register_prefix(&mut self, t: Token, function: PrefixParseFn) {
-    //     self.prefix_parse_fns.insert(t, function);
-    // }
-    //
-    // fn register_infix(&mut self, t: Token, function: InfixParseFn) {
-    //     self.infix_parse_fns.insert(t, function);
-    // }
-    //
-    // fn parse_identifier(&mut self) -> Result<Expression> {
-    //     Ok(Expression::new(self.current_token.clone()))
-    // }
+    fn parse_prefix(&mut self) -> Result<Expression> {
+        let token = self.current_token.clone();
+        self.next_token();
+        let right = self.parse_expression(Precidence::Prefix).unwrap();
+
+        Ok(Expression::Prefix(Box::new(PrefixExpression::new(
+            token, right,
+        ))))
+    }
+    fn peek_precedence(&mut self) -> Precidence {
+        Precidence::from(&self.peek_token)
+    }
 }
 
 #[cfg(test)]
@@ -185,6 +201,7 @@ mod tests {
     use crate::{
         ast::ast::{Expression, PrefixExpression, Return, Statement},
         lexer::lexer::{Lexer, Token},
+        parser,
     };
 
     fn check_errors(errors: Vec<String>) {
@@ -364,6 +381,89 @@ mod tests {
                     _ => todo!(),
                 },
                 _ => println!("Other"),
+            }
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_parsing_infix_expressions() -> Result<()> {
+        struct infix {
+            input: Vec<u8>,
+            left_token: Token,
+            operator: Token,
+            right_token: Token,
+        }
+
+        let tests = vec![
+            infix {
+                input: "5 + 5;".into(),
+                left_token: Token::Int(5),
+                operator: Token::Plus,
+                right_token: Token::Int(5),
+            },
+            infix {
+                input: "5 - 5;".into(),
+                left_token: Token::Int(5),
+                operator: Token::Minus,
+                right_token: Token::Int(5),
+            },
+            infix {
+                input: "5 * 5;".into(),
+                left_token: Token::Int(5),
+                operator: Token::Asterisk,
+                right_token: Token::Int(5),
+            },
+            infix {
+                input: "5 / 5;".into(),
+                left_token: Token::Int(5),
+                operator: Token::Slash,
+                right_token: Token::Int(5),
+            },
+            infix {
+                input: "5 > 5;".into(),
+                left_token: Token::Int(5),
+                operator: Token::GreaterThan,
+                right_token: Token::Int(5),
+            },
+            infix {
+                input: "5 < 5;".into(),
+                left_token: Token::Int(5),
+                operator: Token::LessThan,
+                right_token: Token::Int(5),
+            },
+            infix {
+                input: "5 == 5;".into(),
+                left_token: Token::Int(5),
+                operator: Token::Equal,
+                right_token: Token::Int(5),
+            },
+            infix {
+                input: "5 != 5".into(),
+                left_token: Token::Int(5),
+                operator: Token::NotEqual,
+                right_token: Token::Int(5),
+            },
+        ];
+
+        for (i, test) in tests.into_iter().enumerate() {
+            let lex = Lexer::new(test.input);
+            let mut parser = Parser::new(lex);
+            let program = parser.parse_program().unwrap();
+            check_errors(parser.errors().clone());
+
+            if program.statements.len() != 1 {
+                return Err(anyhow!("Wrong number of statements"));
+            };
+
+            match &program.statements[0] {
+                Statement::Expression(exp) => match exp {
+                    // TODO: finish writing test
+                    Expression::Infix => {}
+                    _ => todo!(),
+                },
+                _ => todo!(),
             }
         }
 
