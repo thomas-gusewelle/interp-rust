@@ -9,8 +9,8 @@ pub enum Statement {
 #[derive(Debug, PartialEq)]
 pub enum Expression {
     Identifier(Token),
-    Intiger(Token),
-    Prefix,
+    Integer(Token),
+    Prefix(Box<PrefixExpression>),
 }
 
 #[derive(Debug, PartialEq)]
@@ -51,17 +51,6 @@ impl Return {
     }
 }
 
-// #[derive(Debug, PartialEq, Clone)]
-// pub struct Expression {
-//     pub token: Token,
-// }
-//
-// impl Expression {
-//     pub fn new(token: Token) -> Expression {
-//         Expression { token }
-//     }
-// }
-
 #[derive(Debug, PartialEq)]
 pub struct Identifier {
     pub token: Token,
@@ -69,5 +58,17 @@ pub struct Identifier {
 impl Identifier {
     pub fn new(token: Token) -> Identifier {
         Identifier { token }
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct PrefixExpression {
+    pub token: Token,
+    pub right: Expression,
+}
+
+impl PrefixExpression {
+    pub fn new(token: Token, right: Expression) -> Self {
+        PrefixExpression { token, right }
     }
 }

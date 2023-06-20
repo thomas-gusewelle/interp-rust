@@ -1,7 +1,7 @@
 use std::{collections::HashMap, path::Prefix};
 
 use crate::{
-    ast::ast::{Expression, Identifier, Let, Program, Return, Statement},
+    ast::ast::{Expression, Identifier, Let, PrefixExpression, Program, Return, Statement},
     lexer::lexer::{Lexer, Token},
 };
 use anyhow::{anyhow, Ok, Result};
@@ -150,7 +150,16 @@ impl Parser {
     fn parse_expression(&mut self, precidence: Precidence) -> Result<Expression> {
         match self.current_token {
             Token::Ident(_) => Ok(Expression::Identifier(self.current_token.clone())),
-            Token::Int(_) => Ok(Expression::Intiger(self.current_token.clone())),
+            Token::Int(_) => Ok(Expression::Integer(self.current_token.clone())),
+            Token::Bang | Token::Minus => {
+                let token = self.current_token.clone();
+                self.next_token();
+                let right = self.parse_expression(Precidence::Prefix).unwrap();
+
+                Ok(Expression::Prefix(Box::new(PrefixExpression::new(
+                    token, right,
+                ))))
+            }
             _ => Err(anyhow!("unknown token type in parse_expression")),
         }
     }
@@ -166,7 +175,6 @@ impl Parser {
     // fn parse_identifier(&mut self) -> Result<Expression> {
     //     Ok(Expression::new(self.current_token.clone()))
     // }
-    //TODO: Create parse_int function
 }
 
 #[cfg(test)]
@@ -175,7 +183,7 @@ mod tests {
     use anyhow::{anyhow, Ok, Result};
 
     use crate::{
-        ast::ast::{Expression, Return, Statement},
+        ast::ast::{Expression, PrefixExpression, Return, Statement},
         lexer::lexer::{Lexer, Token},
     };
 
@@ -299,8 +307,9 @@ mod tests {
 
         match &program.statements[0] {
             Statement::Expression(exp) => match exp {
-                Expression::Identifier(t) => match t {
+                Expression::Integer(t) => match t {
                     Token::Int(s) => {
+                        println!("this is s: {}", s);
                         assert_eq!(s.to_owned(), 5 as usize)
                     }
                     _ => todo!(),
@@ -316,23 +325,23 @@ mod tests {
     fn test_parsing_prefix_expressions() -> Result<()> {
         struct prefix_test {
             input: String,
-            operator: String,
+            operator: Token,
             int_value: usize,
         }
         let tests = vec![
             prefix_test {
                 input: "!5".to_string(),
-                operator: "!".to_string(),
+                operator: Token::Bang,
                 int_value: 5 as usize,
             },
             prefix_test {
                 input: "-15".to_string(),
-                operator: "-".to_string(),
+                operator: Token::Minus,
                 int_value: 15 as usize,
             },
         ];
 
-        for test in tests.into_iter() {
+        for (i, test) in tests.into_iter().enumerate() {
             let lex = Lexer::new(test.input.into());
             let mut parser = Parser::new(lex);
             let program = parser.parse_program().unwrap();
@@ -344,12 +353,14 @@ mod tests {
 
             match &program.statements[0] {
                 Statement::Expression(exp) => match exp {
-                    Expression::Identifier(t) => match t {
-                        Token::Ident(s) => {
-                            assert_eq!(s.to_owned(), test.operator)
+                    Expression::Prefix(t) => {
+                        let prefix_expression = t;
+                        assert_eq!(prefix_expression.token, test.operator);
+                        match &prefix_expression.right {
+                            Expression::Integer(t) => assert_eq!(t, &Token::Int(test.int_value)),
+                            _ => todo!(),
                         }
-                        _ => todo!(),
-                    },
+                    }
                     _ => todo!(),
                 },
                 _ => println!("Other"),
