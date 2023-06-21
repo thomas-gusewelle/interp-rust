@@ -1,11 +1,14 @@
 use std::{collections::HashMap, path::Prefix};
 
 use crate::{
-    ast::ast::{Expression, Identifier, Let, PrefixExpression, Program, Return, Statement},
+    ast::ast::{
+        Expression, Identifier, InfixExpression, Let, PrefixExpression, Program, Return, Statement,
+    },
     lexer::lexer::{Lexer, Token},
 };
 use anyhow::{anyhow, Ok, Result};
 
+#[derive(Debug, PartialEq, Clone)]
 pub enum Precidence {
     Lowest,
     Equals,
@@ -164,17 +167,19 @@ impl Parser {
     }
 
     fn parse_expression(&mut self, precidence: Precidence) -> Result<Expression> {
-        let expression = match precidence {
-            Precidence::Lowest | Precidence::Prefix => match self.current_token {
-                Token::Ident(_) => Ok(Expression::Identifier(self.current_token.clone())),
-                Token::Int(_) => Ok(Expression::Integer(self.current_token.clone())),
-                Token::Bang | Token::Minus => self.parse_prefix(),
-                _ => Err(anyhow!("Unknown token type")),
-            },
-            _ => Err(anyhow!("Unkown precidence type")),
+        let mut expression = match self.current_token {
+            Token::Ident(_) => Ok(Expression::Identifier(self.current_token.clone())),
+            Token::Int(_) => Ok(Expression::Integer(self.current_token.clone())),
+            Token::Bang | Token::Minus => self.parse_prefix(),
+            _ => Err(anyhow!("Unknown token type")),
         };
-        while !self.peek_token_is(Token::Semicolon) && precidence < self.peek_precedence() {
-            unimplemented!();
+
+        while !self.peek_token_is(Token::Semicolon)
+            && (precidence.clone() as i32) < (self.peek_precedence() as i32)
+        {
+            self.next_token();
+            let infix_exp = self.parse_infix(expression?.clone());
+            expression = infix_exp;
         }
         expression
     }
@@ -188,8 +193,33 @@ impl Parser {
             token, right,
         ))))
     }
+    fn parse_infix(&mut self, left: Expression) -> Result<Expression> {
+        let token = self.current_token.clone();
+        let precidence = Precidence::from(&self.current_token);
+        self.next_token();
+        let right = self.parse_expression(precidence);
+
+        Ok(Expression::Infix(Box::new(InfixExpression::new(
+            left,
+            token,
+            right.unwrap(),
+        ))))
+    }
     fn peek_precedence(&mut self) -> Precidence {
         Precidence::from(&self.peek_token)
+    }
+    fn next_token_is_infix_operator(&self) -> bool {
+        match self.peek_token {
+            Token::Plus
+            | Token::Minus
+            | Token::Slash
+            | Token::Asterisk
+            | Token::Equal
+            | Token::NotEqual
+            | Token::LessThan
+            | Token::GreaterThan => true,
+            _ => false,
+        }
     }
 }
 
@@ -391,63 +421,63 @@ mod tests {
     fn test_parsing_infix_expressions() -> Result<()> {
         struct infix {
             input: Vec<u8>,
-            left_token: Token,
+            left_token: Expression,
             operator: Token,
-            right_token: Token,
+            right_token: Expression,
         }
 
         let tests = vec![
             infix {
                 input: "5 + 5;".into(),
-                left_token: Token::Int(5),
+                left_token: Expression::Integer(Token::Int(5)),
                 operator: Token::Plus,
-                right_token: Token::Int(5),
+                right_token: Expression::Integer(Token::Int(5)),
             },
             infix {
                 input: "5 - 5;".into(),
-                left_token: Token::Int(5),
+                left_token: Expression::Integer(Token::Int(5)),
                 operator: Token::Minus,
-                right_token: Token::Int(5),
+                right_token: Expression::Integer(Token::Int(5)),
             },
             infix {
                 input: "5 * 5;".into(),
-                left_token: Token::Int(5),
+                left_token: Expression::Integer(Token::Int(5)),
                 operator: Token::Asterisk,
-                right_token: Token::Int(5),
+                right_token: Expression::Integer(Token::Int(5)),
             },
             infix {
                 input: "5 / 5;".into(),
-                left_token: Token::Int(5),
+                left_token: Expression::Integer(Token::Int(5)),
                 operator: Token::Slash,
-                right_token: Token::Int(5),
+                right_token: Expression::Integer(Token::Int(5)),
             },
             infix {
                 input: "5 > 5;".into(),
-                left_token: Token::Int(5),
+                left_token: Expression::Integer(Token::Int(5)),
                 operator: Token::GreaterThan,
-                right_token: Token::Int(5),
+                right_token: Expression::Integer(Token::Int(5)),
             },
             infix {
                 input: "5 < 5;".into(),
-                left_token: Token::Int(5),
+                left_token: Expression::Integer(Token::Int(5)),
                 operator: Token::LessThan,
-                right_token: Token::Int(5),
+                right_token: Expression::Integer(Token::Int(5)),
             },
             infix {
                 input: "5 == 5;".into(),
-                left_token: Token::Int(5),
+                left_token: Expression::Integer(Token::Int(5)),
                 operator: Token::Equal,
-                right_token: Token::Int(5),
+                right_token: Expression::Integer(Token::Int(5)),
             },
             infix {
                 input: "5 != 5".into(),
-                left_token: Token::Int(5),
+                left_token: Expression::Integer(Token::Int(5)),
                 operator: Token::NotEqual,
-                right_token: Token::Int(5),
+                right_token: Expression::Integer(Token::Int(5)),
             },
         ];
 
-        for (i, test) in tests.into_iter().enumerate() {
+        for test in tests.into_iter() {
             let lex = Lexer::new(test.input);
             let mut parser = Parser::new(lex);
             let program = parser.parse_program().unwrap();
@@ -460,7 +490,11 @@ mod tests {
             match &program.statements[0] {
                 Statement::Expression(exp) => match exp {
                     // TODO: finish writing test
-                    Expression::Infix => {}
+                    Expression::Infix(i) => {
+                        assert_eq!(i.left, test.left_token);
+                        assert_eq!(i.token, test.operator);
+                        assert_eq!(i.right, test.right_token);
+                    }
                     _ => todo!(),
                 },
                 _ => todo!(),

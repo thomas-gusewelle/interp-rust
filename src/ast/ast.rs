@@ -6,12 +6,12 @@ pub enum Statement {
     Return(Return),
     Expression(Expression),
 }
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Expression {
     Identifier(Token),
     Integer(Token),
     Prefix(Box<PrefixExpression>),
-    Infix,
+    Infix(Box<InfixExpression>),
 }
 
 #[derive(Debug, PartialEq)]
@@ -62,7 +62,7 @@ impl Identifier {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct PrefixExpression {
     pub token: Token,
     pub right: Expression,
@@ -71,5 +71,18 @@ pub struct PrefixExpression {
 impl PrefixExpression {
     pub fn new(token: Token, right: Expression) -> Self {
         PrefixExpression { token, right }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct InfixExpression {
+    pub left: Expression,
+    pub token: Token,
+    pub right: Expression,
+}
+
+impl InfixExpression {
+    pub fn new(left: Expression, token: Token, right: Expression) -> Self {
+        InfixExpression { left, token, right }
     }
 }
