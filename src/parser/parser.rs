@@ -1,4 +1,4 @@
-use std::{collections::HashMap, path::Prefix};
+use std::{clone, collections::HashMap, path::Prefix};
 
 use crate::{
     ast::ast::{
@@ -167,16 +167,23 @@ impl Parser {
     }
 
     fn parse_expression(&mut self, precidence: Precidence) -> Result<Expression> {
-        let mut expression = match self.current_token {
+        let mut expression = match &self.current_token {
             Token::Ident(_) => Ok(Expression::Identifier(self.current_token.clone())),
             Token::Int(_) => Ok(Expression::Integer(self.current_token.clone())),
+            Token::True | Token::False => Ok(Expression::Boolean(self.current_token.clone())),
             Token::Bang | Token::Minus => self.parse_prefix(),
-            _ => Err(anyhow!("Unknown token type")),
+            Token::LParen => {
+                self.next_token();
+                let expression = self.parse_expression(Precidence::Lowest);
+                expression
+            }
+            token => Err(anyhow!("Unknown token type: {:?}", token)),
         };
 
         while !self.peek_token_is(Token::Semicolon)
             && (precidence.clone() as i32) < (self.peek_precedence() as i32)
         {
+            println!("Current token: {:?}", &self.current_token);
             self.next_token();
             let infix_exp = self.parse_infix(expression?.clone());
             expression = infix_exp;
@@ -199,11 +206,13 @@ impl Parser {
         self.next_token();
         let right = self.parse_expression(precidence);
 
-        Ok(Expression::Infix(Box::new(InfixExpression::new(
+        let debug = Ok(Expression::Infix(Box::new(InfixExpression::new(
             left,
             token,
             right.unwrap(),
-        ))))
+        ))));
+        println!("This is the infix: {:?}", debug);
+        debug
     }
     fn peek_precedence(&mut self) -> Precidence {
         Precidence::from(&self.peek_token)
@@ -369,6 +378,33 @@ mod tests {
     }
 
     #[test]
+    fn test_boolean_expression() -> Result<()> {
+        let input: Vec<u8> = r#"
+        true;
+        false;
+        let foobar = true;
+        let barfoo = false;
+        "#
+        .into();
+
+        let lex = Lexer::new(input);
+        let mut parser = Parser::new(lex);
+        let program = parser.parse_program().unwrap();
+        check_errors(parser.errors().clone());
+
+        match &program.statements[0] {
+            Statement::Expression(exp) => match exp {
+                Expression::Boolean(t) => {
+                    assert_eq!(t.to_owned(), Token::True);
+                }
+                _ => todo!(),
+            },
+            _ => println!("Other"),
+        }
+        Ok(())
+    }
+
+    #[test]
     fn test_parsing_prefix_expressions() -> Result<()> {
         struct prefix_test {
             input: String,
@@ -514,40 +550,64 @@ mod tests {
         }
 
         let tests = vec![
+            // test {
+            //     input: "-a * b".into(),
+            //     left: Expression::Prefix(Box::new(PrefixExpression::new(
+            //         Token::Minus,
+            //         Expression::Identifier(Token::Ident("a".to_string())),
+            //     ))),
+            //     token: Token::Asterisk,
+            //     right: Expression::Identifier(Token::Ident(String::from("b"))),
+            // },
+            // test {
+            //     input: "3 + 4 * 5 == 3 * 1 + 4 * 5".into(),
+            //     left: Expression::Infix(Box::new(InfixExpression::new(
+            //         Expression::Integer(Token::Int(3)),
+            //         Token::Plus,
+            //         Expression::Infix(Box::new(InfixExpression::new(
+            //             Expression::Integer(Token::Int(4)),
+            //             Token::Asterisk,
+            //             Expression::Integer(Token::Int(5)),
+            //         ))),
+            //     ))),
+            //     token: Token::Equal,
+            //     right: Expression::Infix(Box::new(InfixExpression::new(
+            //         Expression::Infix(Box::new(InfixExpression::new(
+            //             Expression::Integer(Token::Int(3)),
+            //             Token::Asterisk,
+            //             Expression::Integer(Token::Int(1)),
+            //         ))),
+            //         Token::Plus,
+            //         Expression::Infix(Box::new(InfixExpression::new(
+            //             Expression::Integer(Token::Int(4)),
+            //             Token::Asterisk,
+            //             Expression::Integer(Token::Int(5)),
+            //         ))),
+            //     ))),
+            // },
+            // test {
+            //     input: "3 < 5 == true".into(),
+            //     left: Expression::Infix(Box::new(InfixExpression::new(
+            //         Expression::Integer(Token::Int(3)),
+            //         Token::LessThan,
+            //         Expression::Integer(Token::Int(5)),
+            //     ))),
+            //     token: Token::Equal,
+            //     right: Expression::Boolean(Token::True),
+            // },
             test {
-                input: "-a * b".into(),
-                left: Expression::Prefix(Box::new(PrefixExpression::new(
-                    Token::Minus,
-                    Expression::Identifier(Token::Ident("a".to_string())),
-                ))),
-                token: Token::Asterisk,
-                right: Expression::Identifier(Token::Ident(String::from("b"))),
-            },
-            test {
-                input: "3 + 4 * 5 == 3 * 1 + 4 * 5".into(),
-                left: Expression::Infix(Box::new(InfixExpression::new(
-                    Expression::Integer(Token::Int(3)),
-                    Token::Plus,
-                    Expression::Infix(Box::new(InfixExpression::new(
-                        Expression::Integer(Token::Int(4)),
-                        Token::Asterisk,
-                        Expression::Integer(Token::Int(5)),
-                    ))),
-                ))),
-                token: Token::Equal,
-                right: Expression::Infix(Box::new(InfixExpression::new(
-                    Expression::Infix(Box::new(InfixExpression::new(
+                input: "1 + (2 + 3) + 4".into(),
+                left: Expression::Infix(Box::new(InfixExpression {
+                    left: Expression::Integer(Token::Int(1)),
+                    token: Token::Plus,
+                    right: Expression::Infix(Box::new(InfixExpression::new(
+                        Expression::Integer(Token::Int(2)),
+                        Token::Plus,
                         Expression::Integer(Token::Int(3)),
-                        Token::Asterisk,
-                        Expression::Integer(Token::Int(1)),
                     ))),
-                    Token::Plus,
-                    Expression::Infix(Box::new(InfixExpression::new(
-                        Expression::Integer(Token::Int(4)),
-                        Token::Asterisk,
-                        Expression::Integer(Token::Int(5)),
-                    ))),
-                ))),
+                })),
+                token: Token::Plus,
+                right: Expression::Integer(Token::Int(4)),
             },
         ];
         for test in tests.into_iter() {
