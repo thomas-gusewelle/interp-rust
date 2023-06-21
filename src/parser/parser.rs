@@ -513,15 +513,43 @@ mod tests {
             right: Expression,
         }
 
-        let tests = vec![test {
-            input: "-a * b".into(),
-            left: Expression::Prefix(Box::new(PrefixExpression::new(
-                Token::Minus,
-                Expression::Identifier(Token::Ident("a".to_string())),
-            ))),
-            token: Token::Asterisk,
-            right: Expression::Identifier(Token::Ident(String::from("b"))),
-        }];
+        let tests = vec![
+            test {
+                input: "-a * b".into(),
+                left: Expression::Prefix(Box::new(PrefixExpression::new(
+                    Token::Minus,
+                    Expression::Identifier(Token::Ident("a".to_string())),
+                ))),
+                token: Token::Asterisk,
+                right: Expression::Identifier(Token::Ident(String::from("b"))),
+            },
+            test {
+                input: "3 + 4 * 5 == 3 * 1 + 4 * 5".into(),
+                left: Expression::Infix(Box::new(InfixExpression::new(
+                    Expression::Integer(Token::Int(3)),
+                    Token::Plus,
+                    Expression::Infix(Box::new(InfixExpression::new(
+                        Expression::Integer(Token::Int(4)),
+                        Token::Asterisk,
+                        Expression::Integer(Token::Int(5)),
+                    ))),
+                ))),
+                token: Token::Equal,
+                right: Expression::Infix(Box::new(InfixExpression::new(
+                    Expression::Infix(Box::new(InfixExpression::new(
+                        Expression::Integer(Token::Int(3)),
+                        Token::Asterisk,
+                        Expression::Integer(Token::Int(1)),
+                    ))),
+                    Token::Plus,
+                    Expression::Infix(Box::new(InfixExpression::new(
+                        Expression::Integer(Token::Int(4)),
+                        Token::Asterisk,
+                        Expression::Integer(Token::Int(5)),
+                    ))),
+                ))),
+            },
+        ];
         for test in tests.into_iter() {
             let lex = Lexer::new(test.input);
             let mut parser = Parser::new(lex);
