@@ -229,7 +229,7 @@ mod tests {
     use anyhow::{anyhow, Ok, Result};
 
     use crate::{
-        ast::ast::{Expression, PrefixExpression, Return, Statement},
+        ast::ast::{Expression, InfixExpression, PrefixExpression, Return, Statement},
         lexer::lexer::{Lexer, Token},
         parser,
     };
@@ -501,6 +501,48 @@ mod tests {
             }
         }
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_operator_precedence_parsing() -> Result<()> {
+        struct test {
+            input: Vec<u8>,
+            left: Expression,
+            token: Token,
+            right: Expression,
+        }
+
+        let tests = vec![test {
+            input: "-a * b".into(),
+            left: Expression::Prefix(Box::new(PrefixExpression::new(
+                Token::Minus,
+                Expression::Identifier(Token::Ident("a".to_string())),
+            ))),
+            token: Token::Asterisk,
+            right: Expression::Identifier(Token::Ident(String::from("b"))),
+        }];
+        for test in tests.into_iter() {
+            let lex = Lexer::new(test.input);
+            let mut parser = Parser::new(lex);
+            let program = parser.parse_program().unwrap();
+
+            if program.statements.len() != 1 {
+                return Err(anyhow!("Wrong number of statements"));
+            };
+
+            match &program.statements[0] {
+                Statement::Expression(exp) => match exp {
+                    Expression::Infix(i) => {
+                        assert_eq!(i.left, test.left);
+                        assert_eq!(i.token, test.token);
+                        assert_eq!(i.right, test.right);
+                    }
+                    _ => todo!(),
+                },
+                _ => todo!(),
+            }
+        }
         Ok(())
     }
 }
