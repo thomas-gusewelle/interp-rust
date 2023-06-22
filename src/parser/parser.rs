@@ -66,7 +66,7 @@ impl Parser {
         let mut statements: Vec<Statement> = Vec::new();
         while self.current_token != Token::EOF {
             if let Some(s) = self.parse_statement() {
-                println!("{:?}", s);
+                // println!("{:?}", s);
                 statements.push(s);
             };
             self.next_token();
@@ -167,6 +167,7 @@ impl Parser {
     }
 
     fn parse_expression(&mut self, precidence: Precidence) -> Result<Expression> {
+        println!("top call token: {:?}", &self.current_token);
         let mut expression = match &self.current_token {
             Token::Ident(_) => Ok(Expression::Identifier(self.current_token.clone())),
             Token::Int(_) => Ok(Expression::Integer(self.current_token.clone())),
@@ -175,16 +176,30 @@ impl Parser {
             Token::LParen => {
                 self.next_token();
                 let expression = self.parse_expression(Precidence::Lowest);
+
+                if !self.peek_token_is(Token::RParen) {
+                    return Err(anyhow!("Wrong closing token. Did not get RParen"));
+                };
+                // skips the RParen token
+                self.next_token();
                 expression
             }
             token => Err(anyhow!("Unknown token type: {:?}", token)),
         };
+
+        println!(
+            "Precidence from fn: {:?}, Precidence from peek: {:?}, Current token: {:?}",
+            &precidence,
+            &self.peek_precedence(),
+            &self.current_token
+        );
 
         while !self.peek_token_is(Token::Semicolon)
             && (precidence.clone() as i32) < (self.peek_precedence() as i32)
         {
             println!("Current token: {:?}", &self.current_token);
             self.next_token();
+            println!("2 Current token: {:?}", &self.current_token);
             let infix_exp = self.parse_infix(expression?.clone());
             expression = infix_exp;
         }
@@ -201,9 +216,14 @@ impl Parser {
         ))))
     }
     fn parse_infix(&mut self, left: Expression) -> Result<Expression> {
+        println!("Parse Infix Current Token: {:?}", &self.current_token);
         let token = self.current_token.clone();
         let precidence = Precidence::from(&self.current_token);
         self.next_token();
+        println!(
+            "Infix before parse: {:?}, Infix of parse: {:?}",
+            &self.current_token, &precidence
+        );
         let right = self.parse_expression(precidence);
 
         let debug = Ok(Expression::Infix(Box::new(InfixExpression::new(
@@ -211,7 +231,7 @@ impl Parser {
             token,
             right.unwrap(),
         ))));
-        println!("This is the infix: {:?}", debug);
+        // println!("This is the infix: {:?}", debug);
         debug
     }
     fn peek_precedence(&mut self) -> Precidence {
@@ -618,6 +638,8 @@ mod tests {
             if program.statements.len() != 1 {
                 return Err(anyhow!("Wrong number of statements"));
             };
+
+            println!("This is the entire statement: {:?}", program.statements[0]);
 
             match &program.statements[0] {
                 Statement::Expression(exp) => match exp {
