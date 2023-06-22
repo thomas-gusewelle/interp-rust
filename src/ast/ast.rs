@@ -87,3 +87,27 @@ impl InfixExpression {
         InfixExpression { left, token, right }
     }
 }
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct IfExpression {
+    token: Token,
+    condition: Expression,
+    consequence: BlockStatement,
+    alternative: BlockStatement,
+}
+
+impl IfExpression {
+    pub fn new(
+        token: Token,
+        condition: Expression,
+        consequence: BlockStatement,
+        alternative: BlockStatement,
+    ) -> Self {
+        IfExpression {
+            token,
+            condition,
+            consequence,
+            alternative,
+        }
+    }
+}
