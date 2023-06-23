@@ -1,7 +1,7 @@
 use crate::{
     ast::ast::{
-        BlockStatement, Expression, Identifier, IfExpression, InfixExpression, Let,
-        PrefixExpression, Program, Return, Statement,
+        BlockStatement, CallExpression, Expression, FnExpression, Identifier, IfExpression,
+        InfixExpression, Let, PrefixExpression, Program, Return, Statement,
     },
     lexer::lexer::{Lexer, Token},
 };
@@ -29,6 +29,7 @@ impl From<&Token> for Precidence {
             Token::Minus => Precidence::Sum,
             Token::Slash => Precidence::Product,
             Token::Asterisk => Precidence::Product,
+            Token::LParen => Precidence::Call,
             _ => Precidence::Lowest,
         }
     }
@@ -157,6 +158,7 @@ impl Parser {
     }
 
     fn parse_expression(&mut self, precidence: Precidence) -> Result<Expression> {
+        // Base and prefix
         let mut expression = match &self.current_token {
             Token::Ident(_) => Ok(Expression::Identifier(self.current_token.clone())),
             Token::Int(_) => Ok(Expression::Integer(self.current_token.clone())),
@@ -208,15 +210,45 @@ impl Parser {
                     alternative,
                 ))))
             }
+            Token::Function => {
+                let token = self.current_token.clone();
+
+                if !self.expect_peek_and_skip_token(Token::LParen) {
+                    return Err(anyhow!("Expected left paren"));
+                }
+
+                let parameters = self.parse_function_parameters().unwrap();
+
+                if !self.expect_peek_and_skip_token(Token::LBrace) {
+                    return Err(anyhow!("Expected left brace"));
+                }
+
+                let body = self.parse_block_statement().unwrap();
+
+                Ok(Expression::Fn(Box::new(FnExpression::new(
+                    token, parameters, body,
+                ))))
+            }
             token => Err(anyhow!("Unknown token type: {:?}", token)),
         };
 
+        // infix
         while !self.peek_token_is(Token::Semicolon)
             && (precidence.clone() as i32) < (self.peek_precedence() as i32)
         {
             self.next_token();
-            let infix_exp = self.parse_infix(expression?.clone());
-            expression = infix_exp;
+            let exp: Result<Expression> = match &self.current_token {
+                Token::LParen => {
+                    let args = self.parse_call_arguments().unwrap();
+                    Ok(Expression::Call(Box::new(CallExpression::new(
+                        self.current_token.clone(),
+                        expression.unwrap().clone(),
+                        args,
+                    ))))
+                }
+                _ => self.parse_infix(expression?.clone()),
+            };
+            expression = exp;
         }
         expression
     }
@@ -257,6 +289,51 @@ impl Parser {
         }
 
         Ok(BlockStatement::new(token, statements))
+    }
+
+    fn parse_function_parameters(&mut self) -> Result<Option<Vec<Identifier>>> {
+        if self.peek_token_is(Token::RParen) {
+            self.next_token();
+            return Ok(None);
+        };
+
+        self.next_token();
+        let mut identifiers: Vec<Identifier> = vec![Identifier::new(self.current_token.clone())];
+
+        while self.peek_token_is(Token::Comma) {
+            self.next_token();
+            self.next_token();
+            identifiers.push(Identifier::new(self.current_token.clone()));
+        }
+        if !self.expect_peek_and_skip_token(Token::RParen) {
+            return Err(anyhow!("Expected Right paren"));
+        };
+        return Ok(Some(identifiers));
+    }
+
+    fn parse_call_arguments(&mut self) -> Result<Option<Vec<Expression>>> {
+        let mut args: Vec<Expression> = vec![];
+
+        if self.peek_token_is(Token::RParen) {
+            self.next_token();
+            return Ok(None);
+        };
+
+        self.next_token();
+        args.push(self.parse_expression(Precidence::Lowest).unwrap());
+
+        while self.peek_token_is(Token::Comma) {
+            self.next_token();
+            self.next_token();
+
+            args.push(self.parse_expression(Precidence::Lowest).unwrap());
+        }
+
+        if !self.expect_peek_and_skip_token(Token::RParen) {
+            return Err(anyhow!("Expected right paren"));
+        }
+
+        return Ok(Some(args));
     }
 }
 
@@ -784,6 +861,55 @@ mod tests {
             }
         }
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_call_function_expression_parsing() -> Result<()> {
+        struct Test {
+            input: Vec<u8>,
+            function: Expression,
+            arguments: Option<Vec<Expression>>,
+        }
+
+        let tests = vec![Test {
+            input: "add(1, 2 * 3, 4 +5)".into(),
+            function: Expression::Identifier(Token::Ident(String::from("add"))),
+            arguments: Some(vec![
+                Expression::Integer(Token::Int(1)),
+                Expression::Infix(Box::new(InfixExpression::new(
+                    Expression::Integer(Token::Int(2)),
+                    Token::Asterisk,
+                    Expression::Integer(Token::Int(3)),
+                ))),
+                Expression::Infix(Box::new(InfixExpression::new(
+                    Expression::Integer(Token::Int(4)),
+                    Token::Plus,
+                    Expression::Integer(Token::Int(5)),
+                ))),
+            ]),
+        }];
+
+        for test in tests.into_iter() {
+            let lex = Lexer::new(test.input);
+            let mut parser = Parser::new(lex);
+            let program = parser.parse_program().unwrap();
+
+            if program.statements.len() != 1 {
+                return Err(anyhow!("wrong number of statements"));
+            }
+
+            match &program.statements[0] {
+                Statement::Expression(exp) => match exp {
+                    Expression::Call(c) => {
+                        assert_eq!(c.function, test.function);
+                        assert_eq!(c.arguments, test.arguments);
+                    }
+                    _ => todo!(),
+                },
+                _ => todo!(),
+            }
+        }
         Ok(())
     }
 }

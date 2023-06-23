@@ -15,6 +15,7 @@ pub enum Expression {
     Infix(Box<InfixExpression>),
     If(Box<IfExpression>),
     Fn(Box<FnExpression>),
+    Call(Box<CallExpression>),
 }
 
 #[derive(Debug, PartialEq)]
@@ -139,6 +140,23 @@ impl FnExpression {
             token,
             parameters,
             body,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct CallExpression {
+    pub token: Token,
+    pub function: Expression,
+    pub arguments: Option<Vec<Expression>>,
+}
+
+impl CallExpression {
+    pub fn new(token: Token, function: Expression, arguments: Option<Vec<Expression>>) -> Self {
+        CallExpression {
+            token,
+            function,
+            arguments,
         }
     }
 }
