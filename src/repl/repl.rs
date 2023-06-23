@@ -1,6 +1,6 @@
 use std::io::Write;
 
-use crate::lexer::lexer::{Lexer, Token};
+use crate::{lexer::lexer::Lexer, parser::parser::Parser};
 
 pub fn start() {
     loop {
@@ -11,13 +11,15 @@ pub fn start() {
         if input_string.is_empty() {
             return;
         }
-        let mut lexer = Lexer::new(input_string.into_bytes());
-        loop {
-            let token = lexer.next_token();
-            println!("{}", token);
-            if token == Token::EOF {
-                break;
-            }
+        let lexer = Lexer::new(input_string.into_bytes());
+        let mut parser = Parser::new(lexer);
+
+        let program = parser.parse_program();
+        if parser.errors().len() != 0 {
+            println!("There was an error in the program");
+            continue;
         }
+
+        println!("{:?}", program);
     }
 }
