@@ -1,6 +1,6 @@
 use crate::lexer::lexer::Token;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Statement {
     Let(Let),
     Return(Return),
@@ -13,6 +13,8 @@ pub enum Expression {
     Boolean(Token),
     Prefix(Box<PrefixExpression>),
     Infix(Box<InfixExpression>),
+    If(Box<IfExpression>),
+    Fn(Box<FnExpression>),
 }
 
 #[derive(Debug, PartialEq)]
@@ -26,7 +28,7 @@ impl Program {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Let {
     pub token: Token,
     pub name: Identifier,
@@ -39,7 +41,7 @@ impl Let {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Return {
     pub token: Token,
     pub return_value: Expression,
@@ -53,7 +55,7 @@ impl Return {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Identifier {
     pub token: Token,
 }
@@ -90,10 +92,10 @@ impl InfixExpression {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct IfExpression {
-    token: Token,
-    condition: Expression,
-    consequence: BlockStatement,
-    alternative: BlockStatement,
+    pub token: Token,
+    pub condition: Expression,
+    pub consequence: BlockStatement,
+    pub alternative: Option<BlockStatement>,
 }
 
 impl IfExpression {
@@ -101,13 +103,42 @@ impl IfExpression {
         token: Token,
         condition: Expression,
         consequence: BlockStatement,
-        alternative: BlockStatement,
+        alternative: Option<BlockStatement>,
     ) -> Self {
         IfExpression {
             token,
             condition,
             consequence,
             alternative,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct BlockStatement {
+    token: Token,
+    statements: Vec<Statement>,
+}
+
+impl BlockStatement {
+    pub fn new(token: Token, statements: Vec<Statement>) -> Self {
+        BlockStatement { token, statements }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct FnExpression {
+    pub token: Token,
+    pub parameters: Option<Vec<Identifier>>,
+    pub body: BlockStatement,
+}
+
+impl FnExpression {
+    pub fn new(token: Token, parameters: Option<Vec<Identifier>>, body: BlockStatement) -> Self {
+        FnExpression {
+            token,
+            parameters,
+            body,
         }
     }
 }

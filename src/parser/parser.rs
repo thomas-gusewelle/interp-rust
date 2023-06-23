@@ -1,6 +1,7 @@
 use crate::{
     ast::ast::{
-        Expression, Identifier, InfixExpression, Let, PrefixExpression, Program, Return, Statement,
+        BlockStatement, Expression, Identifier, IfExpression, InfixExpression, Let,
+        PrefixExpression, Program, Return, Statement,
     },
     lexer::lexer::{Lexer, Token},
 };
@@ -57,7 +58,6 @@ impl Parser {
         let mut statements: Vec<Statement> = Vec::new();
         while self.current_token != Token::EOF {
             if let Some(s) = self.parse_statement() {
-                // println!("{:?}", s);
                 statements.push(s);
             };
             self.next_token();
@@ -95,18 +95,17 @@ impl Parser {
         }
     }
     fn parse_let_statement(&mut self) -> Result<Let> {
-        if !self.expect_peek(Token::Ident(String::new())) {
+        if !self.expect_peek_and_skip_token(Token::Ident(String::new())) {
             return Err(anyhow!("Wrong token type"));
         }
         let ident_token = self.current_token.clone();
         let identifier = Identifier::new(self.current_token.clone());
 
-        if !self.expect_peek(Token::Assign) {
+        if !self.expect_peek_and_skip_token(Token::Assign) {
             return Err(anyhow!("Expected token of Assign"));
         }
 
         while !self.current_token_is(Token::Semicolon) {
-            println!("Token: {:?}", self.current_token);
             self.next_token();
         }
 
@@ -137,7 +136,7 @@ impl Parser {
         std::mem::discriminant(&self.peek_token) == std::mem::discriminant(&t)
     }
 
-    fn expect_peek(&mut self, t: Token) -> bool {
+    fn expect_peek_and_skip_token(&mut self, t: Token) -> bool {
         if self.peek_token_is(t.clone()) {
             self.next_token();
             return true;
@@ -167,12 +166,47 @@ impl Parser {
                 self.next_token();
                 let expression = self.parse_expression(Precidence::Lowest);
 
-                if !self.peek_token_is(Token::RParen) {
+                if !self.expect_peek_and_skip_token(Token::RParen) {
                     return Err(anyhow!("Wrong closing token. Did not get RParen"));
                 };
-                // skips the RParen token
-                self.next_token();
                 expression
+            }
+            Token::If => {
+                let token = self.current_token.clone();
+
+                if !self.expect_peek_and_skip_token(Token::LParen) {
+                    return Err(anyhow!("Next token should be LParen"));
+                };
+
+                self.next_token();
+                let condition = self.parse_expression(Precidence::Lowest).unwrap();
+
+                if !self.expect_peek_and_skip_token(Token::RParen) {
+                    return Err(anyhow!("Next token should be RParen"));
+                };
+
+                if !self.expect_peek_and_skip_token(Token::LBrace) {
+                    return Err(anyhow!("Expected left brace"));
+                };
+
+                let consequence = self.parse_block_statement().unwrap();
+
+                let alternative = if self.peek_token_is(Token::Else) {
+                    self.next_token();
+                    if !self.expect_peek_and_skip_token(Token::LBrace) {
+                        return Err(anyhow!("Expected Left Brace"));
+                    }
+                    Some(self.parse_block_statement().unwrap())
+                } else {
+                    None
+                };
+
+                Ok(Expression::If(Box::new(IfExpression::new(
+                    token,
+                    condition,
+                    consequence,
+                    alternative,
+                ))))
             }
             token => Err(anyhow!("Unknown token type: {:?}", token)),
         };
@@ -211,6 +245,19 @@ impl Parser {
     fn peek_precedence(&mut self) -> Precidence {
         Precidence::from(&self.peek_token)
     }
+    fn parse_block_statement(&mut self) -> Result<BlockStatement> {
+        let token = self.current_token.clone();
+        let mut statements: Vec<Statement> = vec![];
+        self.next_token();
+
+        while !self.current_token_is(Token::RBrace) && !self.current_token_is(Token::EOF) {
+            let statement = self.parse_statement().unwrap();
+            statements.push(statement);
+            self.next_token();
+        }
+
+        Ok(BlockStatement::new(token, statements))
+    }
 }
 
 #[cfg(test)]
@@ -219,7 +266,10 @@ mod tests {
     use anyhow::{anyhow, Ok, Result};
 
     use crate::{
-        ast::ast::{Expression, InfixExpression, PrefixExpression, Return, Statement},
+        ast::ast::{
+            BlockStatement, Expression, Identifier, InfixExpression, PrefixExpression, Return,
+            Statement,
+        },
         lexer::lexer::{Lexer, Token},
     };
 
@@ -237,7 +287,6 @@ mod tests {
     use super::Parser;
     #[test]
     fn test_let_statment() -> Result<()> {
-        println!("here 101");
         let input = r#"
         let x = 5;
         let y = 10;
@@ -259,7 +308,6 @@ mod tests {
             Token::Ident(String::from("foobar")),
         ];
         for (i, ident) in expected_idents.into_iter().enumerate() {
-            println!("Here 123");
             let statment = &program.statements[i];
             match statment {
                 Statement::Let(x) => {
@@ -345,7 +393,6 @@ mod tests {
             Statement::Expression(exp) => match exp {
                 Expression::Integer(t) => match t {
                     Token::Int(s) => {
-                        println!("this is s: {}", s);
                         assert_eq!(s.to_owned(), 5 as usize)
                     }
                     _ => todo!(),
@@ -599,8 +646,6 @@ mod tests {
                 return Err(anyhow!("Wrong number of statements"));
             };
 
-            println!("This is the entire statement: {:?}", program.statements[0]);
-
             match &program.statements[0] {
                 Statement::Expression(exp) => match exp {
                     Expression::Infix(i) => {
@@ -618,16 +663,127 @@ mod tests {
 
     #[test]
     fn test_if_expression() -> Result<()> {
-        let input: Vec<u8> = "if (x < y) {x}".into();
-
-        let lex = Lexer::new(input);
-        let mut parser = Parser::new(lex);
-        let program = parser.parse_program().unwrap();
-        check_errors(parser.errors().clone());
-
-        if program.statements.len() != 1 {
-            return Err(anyhow!("Wrong number of statements"));
+        struct Test {
+            input: Vec<u8>,
+            token: Token,
+            condition: Expression,
+            consequnce: BlockStatement,
+            alternative: Option<BlockStatement>,
         }
+
+        let tests = vec![
+            Test {
+                input: "if (x < y) {x}".into(),
+                token: Token::If,
+                condition: Expression::Infix(Box::new(InfixExpression::new(
+                    Expression::Identifier(Token::Ident(String::from("x"))),
+                    Token::LessThan,
+                    Expression::Identifier(Token::Ident(String::from("y"))),
+                ))),
+                consequnce: BlockStatement::new(
+                    Token::LBrace,
+                    vec![Statement::Expression(Expression::Identifier(Token::Ident(
+                        String::from("x"),
+                    )))],
+                ),
+                alternative: None,
+            },
+            Test {
+                input: "if (x < y) {x} else {y}".into(),
+                token: Token::If,
+                condition: Expression::Infix(Box::new(InfixExpression::new(
+                    Expression::Identifier(Token::Ident(String::from("x"))),
+                    Token::LessThan,
+                    Expression::Identifier(Token::Ident(String::from("y"))),
+                ))),
+                consequnce: BlockStatement::new(
+                    Token::LBrace,
+                    vec![Statement::Expression(Expression::Identifier(Token::Ident(
+                        String::from("x"),
+                    )))],
+                ),
+                alternative: Some(BlockStatement::new(
+                    Token::LBrace,
+                    vec![Statement::Expression(Expression::Identifier(Token::Ident(
+                        String::from("y"),
+                    )))],
+                )),
+            },
+        ];
+
+        for test in tests.into_iter() {
+            let lex = Lexer::new(test.input);
+            let mut parser = Parser::new(lex);
+            let program = parser.parse_program().unwrap();
+            check_errors(parser.errors().clone());
+
+            if program.statements.len() != 1 {
+                return Err(anyhow!("Wrong number of statements"));
+            }
+            match &program.statements[0] {
+                Statement::Expression(exp) => match exp {
+                    Expression::If(i) => {
+                        assert_eq!(i.token, test.token);
+                        assert_eq!(i.condition, test.condition);
+                        assert_eq!(i.consequence, test.consequnce);
+                        assert_eq!(i.alternative, test.alternative);
+                    }
+                    _ => todo!(),
+                },
+                _ => todo!(),
+            }
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_function_expression() -> Result<()> {
+        struct Test {
+            input: Vec<u8>,
+            paramaters: Option<Vec<Identifier>>,
+            body: BlockStatement,
+        }
+
+        let tests = vec![Test {
+            input: "fn(x,y) {x+y}".into(),
+            paramaters: Some(vec![
+                Identifier::new(Token::Ident(String::from("x"))),
+                Identifier::new(Token::Ident(String::from("y"))),
+            ]),
+            body: BlockStatement::new(
+                Token::LBrace,
+                vec![Statement::Expression(Expression::Infix(Box::new(
+                    InfixExpression::new(
+                        Expression::Identifier(Token::Ident(String::from("x"))),
+                        Token::Plus,
+                        Expression::Identifier(Token::Ident(String::from("y"))),
+                    ),
+                )))],
+            ),
+        }];
+
+        for test in tests.into_iter() {
+            let lex = Lexer::new(test.input);
+            let mut parser = Parser::new(lex);
+            let program = parser.parse_program().unwrap();
+
+            if program.statements.len() != 1 {
+                return Err(anyhow!("Wrong number of statements"));
+            }
+
+            match &program.statements[0] {
+                Statement::Expression(exp) => match exp {
+                    Expression::Fn(f) => {
+                        assert_eq!(test.paramaters, f.parameters);
+                        assert_eq!(test.body, f.body);
+                    }
+                    _ => todo!(),
+                },
+                _ => todo!(),
+            }
+        }
+
         Ok(())
     }
 }
