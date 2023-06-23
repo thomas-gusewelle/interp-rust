@@ -106,15 +106,14 @@ impl Parser {
             return Err(anyhow!("Expected token of Assign"));
         }
 
-        while !self.current_token_is(Token::Semicolon) {
-            self.next_token();
-        }
+        self.next_token();
+        let expression = self.parse_expression(Precidence::Lowest).unwrap();
 
-        return Ok(Let::new(
-            ident_token,
-            identifier,
-            Expression::Identifier(self.current_token.clone()),
-        ));
+        if self.peek_token_is(Token::Semicolon) {
+            self.next_token();
+        };
+
+        return Ok(Let::new(ident_token, identifier, expression));
     }
 
     fn parse_return_statement(&mut self) -> Result<Statement> {
@@ -122,12 +121,12 @@ impl Parser {
 
         self.next_token();
 
-        // TODO: Skipping expressions for now
-        while !self.current_token_is(Token::Semicolon) {
+        let expression = self.parse_expression(Precidence::Lowest).unwrap();
+
+        if self.peek_token_is(Token::Semicolon) {
             self.next_token();
-        }
-        let return_inside = Return::new(token, Expression::Identifier(self.current_token.clone()));
-        Ok(Statement::Return(return_inside))
+        };
+        Ok(Statement::Return(Return::new(token, expression)))
     }
 
     fn current_token_is(&mut self, t: Token) -> bool {
