@@ -1,6 +1,6 @@
-use std::io::Write;
+use std::{fmt::Debug, io::Write};
 
-use crate::{lexer::lexer::Lexer, parser::parser::Parser};
+use crate::{lexer::lexer::Lexer, object::object::Object, parser::parser::Parser};
 
 pub fn start() {
     loop {
@@ -14,12 +14,14 @@ pub fn start() {
         let lexer = Lexer::new(input_string.into_bytes());
         let mut parser = Parser::new(lexer);
 
-        let program = parser.parse_program();
+        let program = parser.parse_program().unwrap();
         if parser.errors().len() != 0 {
             println!("There was an error in the program");
             continue;
         }
 
-        println!("{:?}", program);
+        let eval = Object::eval(program.statements);
+
+        println!("{}", eval);
     }
 }
