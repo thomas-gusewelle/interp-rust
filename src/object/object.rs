@@ -1,8 +1,21 @@
+use std::collections::HashMap;
 use std::fmt::Display;
 
 use crate::ast::ast::{Expression, Statement};
 use crate::lexer::lexer::Token;
 use anyhow::{anyhow, Ok, Result};
+
+pub struct Environment {
+    pub store: HashMap<String, Object>,
+}
+
+impl Environment {
+    pub fn new() -> Self {
+        Environment {
+            store: HashMap::new(),
+        }
+    }
+}
 
 #[derive(PartialEq, Clone, Debug)]
 pub enum Object {
@@ -10,6 +23,7 @@ pub enum Object {
     Boolean(bool),
     Null,
     Return(Box<Object>),
+    Let(Box<Object>),
 }
 
 impl Display for Object {
@@ -19,18 +33,21 @@ impl Display for Object {
             Object::Boolean(b) => write!(f, "Bool value: {}", b),
             Object::Null => write!(f, "Null value"),
             Object::Return(o) => write!(f, "Return value: {}", o),
+            Object::Let(l) => write!(f, "Let Value: {}", l),
         };
     }
 }
 
 impl Object {
-    pub fn eval(nodes: Vec<Statement>) -> Self {
+    pub fn eval(nodes: Vec<Statement>, env: &Environment) -> Self {
         let mut result: Result<Object> = Ok(Object::Null);
         'stacks: for node in nodes.into_iter() {
             result = match node {
-                Statement::Let(l) => Err(anyhow!("Todo")),
+                Statement::Let(l) => {
+                    let val = Object::eval(vec![Statement::Expression(l.value)], env);
+                }
                 Statement::Return(r) => {
-                    let val = Object::eval(vec![Statement::Expression(r.return_value)]);
+                    let val = Object::eval(vec![Statement::Expression(r.return_value)], env);
                     // return breaks the loop here
                     return Object::Return(Box::new(val));
                 }
@@ -49,7 +66,7 @@ impl Object {
                         _ => Err(anyhow!("Wrong token type. Expected Boolean, Got: {:?}", b)),
                     },
                     Expression::Prefix(p) => {
-                        let right = Object::eval(vec![Statement::Expression(p.right)]);
+                        let right = Object::eval(vec![Statement::Expression(p.right)], env);
                         match &p.token {
                             Token::Bang => match right {
                                 Object::Boolean(true) => Ok(Object::Boolean(false)),
@@ -65,8 +82,8 @@ impl Object {
                         }
                     }
                     Expression::Infix(inf) => {
-                        let left = Object::eval(vec![Statement::Expression(inf.left)]);
-                        let right = Object::eval(vec![Statement::Expression(inf.right)]);
+                        let left = Object::eval(vec![Statement::Expression(inf.left)], env);
+                        let right = Object::eval(vec![Statement::Expression(inf.right)], env);
 
                         match (left, right) {
                             (Object::Integer(il), Object::Integer(ir)) => match inf.token {
@@ -89,15 +106,17 @@ impl Object {
                         }
                     }
                     Expression::If(i) => {
-                        let condition = Object::eval(vec![Statement::Expression(i.condition)]);
+                        let condition = Object::eval(vec![Statement::Expression(i.condition)], env);
+                        // checking both if and else if for return statement to facilitiate nested
+                        // block statements that have returns
                         if condition.is_truthy() {
-                            let object = Object::eval(i.consequence.statements);
+                            let object = Object::eval(i.consequence.statements, env);
                             if object.expect_object_is(&Object::Return(Box::new(Object::Null))) {
                                 return object;
                             };
                             Ok(object)
                         } else if let Some(alt) = i.alternative {
-                            let object = Object::eval(alt.statements);
+                            let object = Object::eval(alt.statements, env);
                             if object.expect_object_is(&Object::Return(Box::new(Object::Null))) {
                                 return object;
                             };
@@ -132,6 +151,38 @@ mod test {
     use crate::object::object::Object;
     use crate::parser::parser::Parser;
 
+    use super::Environment;
+
+    #[test]
+    fn test_let_statements() {
+        struct Test {
+            input: Vec<u8>,
+            expected: Object,
+        }
+        let tests = vec![
+            Test {
+                input: "let a = 5; a;".into(),
+                expected: Object::Let(Box::new(Object::Integer(10))),
+            },
+            Test {
+                input: "let a = 5*5; a;".into(),
+                expected: Object::Let(Box::new(Object::Integer(25))),
+            },
+            Test {
+                input: "let a =5; let b = a; b".into(),
+                expected: Object::Let(Box::new(Object::Integer(5))),
+            },
+            Test {
+                input: "let a =5; let b =a; let c= a+b+5;".into(),
+                expected: Object::Return(Box::new(Object::Integer(15))),
+            },
+        ];
+
+        for test in tests.into_iter() {
+            let evaluated = test_eval(test.input);
+            assert_eq!(test.expected, evaluated);
+        }
+    }
     #[test]
     fn test_return_statements() {
         struct Test {
@@ -390,7 +441,8 @@ mod test {
         let lex = Lexer::new(input);
         let mut parser = Parser::new(lex);
         let program = parser.parse_program().unwrap();
+        let env = Environment::new();
 
-        return Object::eval(program.statements);
+        return Object::eval(program.statements, &env);
     }
 }
