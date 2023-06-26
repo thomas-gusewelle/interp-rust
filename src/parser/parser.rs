@@ -469,7 +469,7 @@ mod tests {
             Statement::Expression(exp) => match exp {
                 Expression::Integer(t) => match t {
                     Token::Int(s) => {
-                        assert_eq!(s.to_owned(), 5 as usize)
+                        assert_eq!(s.to_owned(), 5 as isize)
                     }
                     _ => todo!(),
                 },
@@ -512,18 +512,18 @@ mod tests {
         struct PrefixTest {
             input: String,
             operator: Token,
-            int_value: usize,
+            int_value: isize,
         }
         let tests = vec![
             PrefixTest {
                 input: "!5".to_string(),
                 operator: Token::Bang,
-                int_value: 5 as usize,
+                int_value: 5 as isize,
             },
             PrefixTest {
                 input: "-15".to_string(),
                 operator: Token::Minus,
-                int_value: 15 as usize,
+                int_value: 15 as isize,
             },
         ];
 

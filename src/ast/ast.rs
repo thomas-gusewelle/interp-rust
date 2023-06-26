@@ -117,8 +117,8 @@ impl IfExpression {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct BlockStatement {
-    token: Token,
-    statements: Vec<Statement>,
+    pub token: Token,
+    pub statements: Vec<Statement>,
 }
 
 impl BlockStatement {

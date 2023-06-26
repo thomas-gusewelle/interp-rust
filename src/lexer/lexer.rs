@@ -7,7 +7,7 @@ pub enum Token {
     EOF,
 
     Ident(String),
-    Int(usize),
+    Int(isize),
 
     Assign,
     Plus,
@@ -184,7 +184,7 @@ impl Lexer {
         }
     }
 
-    fn read_number(&mut self) -> usize {
+    fn read_number(&mut self) -> isize {
         let position = self.position;
         while self.ch.is_ascii_digit() {
             self.read_char();
