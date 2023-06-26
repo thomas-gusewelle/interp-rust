@@ -31,9 +31,18 @@ impl Object {
                 Statement::Expression(e) => match e {
                     Expression::Integer(i) => match i {
                         Token::Int(int) => Ok(Object::Integer(int)),
-                        _ => Err(anyhow!("Todo")),
+                        _ => Err(anyhow!(
+                            "Wrong Token Type: Expected: {:?}, Got: {:?}",
+                            Token::Int(0),
+                            i
+                        )),
                     },
-                    _ => Err(anyhow!("Todo")),
+                    Expression::Boolean(b) => match b {
+                        Token::True => Ok(Object::Boolean(true)),
+                        Token::False => Ok(Object::Boolean(false)),
+                        _ => Err(anyhow!("Wrong token type. Expected Boolean, Got: {:?}", b)),
+                    },
+                    _ => Ok(Object::Null),
                 },
             };
         }
@@ -70,6 +79,28 @@ mod test {
         }
     }
 
+    #[test]
+    fn test_boolean_experssion() {
+        struct Test {
+            input: Vec<u8>,
+            expected: Object,
+        }
+        let tests = vec![
+            Test {
+                input: "true".into(),
+                expected: Object::Boolean(true),
+            },
+            Test {
+                input: "false".into(),
+                expected: Object::Boolean(false),
+            },
+        ];
+
+        for test in tests.into_iter() {
+            let evaluated = test_eval(test.input);
+            assert_eq!(test.expected, evaluated);
+        }
+    }
     pub fn test_eval(input: Vec<u8>) -> Object {
         let lex = Lexer::new(input);
         let mut parser = Parser::new(lex);
