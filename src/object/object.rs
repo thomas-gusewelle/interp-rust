@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use crate::ast::ast::{Expression, Statement};
 use crate::lexer::lexer::Token;
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Ok, Result};
 
 #[derive(PartialEq, Clone, Debug)]
 pub enum Object {
@@ -42,6 +42,18 @@ impl Object {
                         Token::False => Ok(Object::Boolean(false)),
                         _ => Err(anyhow!("Wrong token type. Expected Boolean, Got: {:?}", b)),
                     },
+                    Expression::Prefix(p) => {
+                        let right = Object::eval(vec![Statement::Expression(p.right)]);
+                        match &p.token {
+                            Token::Bang => match right {
+                                Object::Boolean(true) => Ok(Object::Boolean(false)),
+                                Object::Boolean(false) => Ok(Object::Boolean(true)),
+                                Object::Null => Ok(Object::Boolean(true)),
+                                _ => Ok(Object::Boolean(false)),
+                            },
+                            _ => Err(anyhow!("Wrong Token Type")),
+                        }
+                    }
                     _ => Ok(Object::Null),
                 },
             };
@@ -101,7 +113,46 @@ mod test {
             assert_eq!(test.expected, evaluated);
         }
     }
-    pub fn test_eval(input: Vec<u8>) -> Object {
+
+    #[test]
+    fn test_bang_operator() {
+        struct Test {
+            input: Vec<u8>,
+            expected: Object,
+        }
+        let tests = vec![
+            Test {
+                input: "!true".into(),
+                expected: Object::Boolean(false),
+            },
+            Test {
+                input: "!false".into(),
+                expected: Object::Boolean(true),
+            },
+            Test {
+                input: "!5".into(),
+                expected: Object::Boolean(false),
+            },
+            Test {
+                input: "!!true".into(),
+                expected: Object::Boolean(true),
+            },
+            Test {
+                input: "!!false".into(),
+                expected: Object::Boolean(false),
+            },
+            Test {
+                input: "!!5".into(),
+                expected: Object::Boolean(true),
+            },
+        ];
+
+        for test in tests.into_iter() {
+            let evaluated = test_eval(test.input);
+            assert_eq!(test.expected, evaluated);
+        }
+    }
+    fn test_eval(input: Vec<u8>) -> Object {
         let lex = Lexer::new(input);
         let mut parser = Parser::new(lex);
         let program = parser.parse_program().unwrap();
