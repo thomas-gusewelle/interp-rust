@@ -7,6 +7,7 @@ use crate::{
 };
 
 pub fn start() {
+    let mut env = Environment::new();
     loop {
         print!(">> ");
         std::io::stdout().flush().unwrap();
@@ -24,7 +25,7 @@ pub fn start() {
             continue;
         }
 
-        let eval = Object::eval(program.statements, &mut Environment::new());
+        let eval = Object::eval(program.statements, &mut env);
 
         println!("{}", eval);
     }

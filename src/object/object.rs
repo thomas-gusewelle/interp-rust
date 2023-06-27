@@ -176,7 +176,9 @@ impl Object {
                             //TODO: needs to be extended to assign new ident into env
                             match val {
                                 Some(v) => Ok(v.to_owned()),
-                                None => Err(anyhow!("Ident value does not already exist.")),
+                                None => {
+                                    Err(anyhow!("Ident value does not already exist. Got: {}", s))
+                                }
                             }
                         }
                         _ => Err(anyhow!("Wrong token type for identifier")),
@@ -190,7 +192,6 @@ impl Object {
                         let func = Object::eval(vec![Statement::Expression(call.function)], env);
                         // turn arguments into objects
                         let mut args: Vec<Object> = vec![];
-                        println!("This is the args: {:?}", call.arguments);
                         if let Some(arguments) = call.arguments {
                             for arg in arguments.into_iter() {
                                 let eval = Object::eval(vec![Statement::Expression(arg)], env);
@@ -207,7 +208,6 @@ impl Object {
                                     for (i, param) in params.into_iter().enumerate() {
                                         match param.token {
                                             Token::Ident(s) => {
-                                                println!("this is the index: {}", i);
                                                 extended_env.store.insert(s, args[i].to_owned());
                                             }
                                             _ => todo!(),
@@ -252,6 +252,23 @@ mod test {
 
     use super::Environment;
 
+    #[test]
+    fn test_closures() {
+        struct Test {
+            input: Vec<u8>,
+            expected: Object,
+        }
+        let tests = vec![Test {
+            input: "let newAdder = fn(x) {fn(y) { x + y };};let addTwo = newAdder(2);addTwo(2);"
+                .into(),
+            expected: Object::Integer(4),
+        }];
+
+        for test in tests.into_iter() {
+            let evaluated = test_eval(test.input);
+            assert_eq!(test.expected, evaluated);
+        }
+    }
     #[test]
     fn test_function() {
         struct Test {
