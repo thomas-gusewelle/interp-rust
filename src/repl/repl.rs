@@ -1,6 +1,10 @@
 use std::{fmt::Debug, io::Write};
 
-use crate::{lexer::lexer::Lexer, object::object::Object, parser::parser::Parser};
+use crate::{
+    lexer::lexer::Lexer,
+    object::object::{Environment, Object},
+    parser::parser::Parser,
+};
 
 pub fn start() {
     loop {
@@ -20,7 +24,7 @@ pub fn start() {
             continue;
         }
 
-        let eval = Object::eval(program.statements);
+        let eval = Object::eval(program.statements, &Environment::new());
 
         println!("{}", eval);
     }

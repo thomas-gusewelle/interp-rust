@@ -5,6 +5,7 @@ use crate::ast::ast::{BlockStatement, Expression, Identifier, Statement};
 use crate::lexer::lexer::Token;
 use anyhow::{anyhow, Ok, Result};
 
+#[derive(PartialEq, Clone, Debug)]
 pub struct Environment {
     pub store: HashMap<String, Object>,
     pub outer_env: Option<Box<Environment>>,
@@ -20,7 +21,7 @@ impl Environment {
     pub fn new_enclosed_environment(&self) -> Self {
         Environment {
             store: HashMap::new(),
-            outer_env: Some(Box::new(*self.clone())),
+            outer_env: Some(Box::new(self.to_owned())),
         }
     }
     pub fn get(&self, name: &String) -> Result<Object> {
@@ -28,7 +29,7 @@ impl Environment {
         match obj {
             Some(o) => return Ok(o.to_owned()),
             None => {
-                if let Some(outer) = self.outer_env {
+                if let Some(outer) = &self.outer_env {
                     let object = outer.store.get(name);
                     match object {
                         Some(o) => Ok(o.to_owned()),
@@ -84,6 +85,7 @@ impl Object {
             result = match node {
                 Statement::Let(l) => {
                     let val = Object::eval(vec![Statement::Expression(l.value)], env);
+                    Err(anyhow!("Todo"))
                 }
                 Statement::Return(r) => {
                     let val = Object::eval(vec![Statement::Expression(r.return_value)], env);
@@ -180,15 +182,43 @@ impl Object {
                         func.body,
                     ))),
                     Expression::Call(call) => {
+                        // Get function from call
                         let func = Object::eval(vec![Statement::Expression(call.function)], env);
-                        let args: Vec<Object> = vec![];
+                        // turn arguments into objects
+                        let mut args: Vec<Object> = vec![];
                         if let Some(arguments) = call.arguments {
                             for arg in arguments.into_iter() {
                                 let eval = Object::eval(vec![Statement::Expression(arg)], env);
                                 args.push(eval)
                             }
                         }
-                        Ok(func)
+
+                        //apply the fucntion
+                        let mut extended_env = env.new_enclosed_environment();
+                        match func {
+                            Object::Function(f) => {
+                                // gets the params from function and adds the idents to extended_env
+                                if let Some(params) = f.parameters {
+                                    for (i, param) in params.into_iter().enumerate() {
+                                        match param.token {
+                                            Token::Ident(s) => {
+                                                extended_env.store.insert(s, args[i].to_owned());
+                                            }
+                                            _ => todo!(),
+                                        }
+                                    }
+                                }
+                                let eval_body = Object::eval(f.body.statements, &extended_env);
+                                match eval_body {
+                                    Object::Return(r) => Ok(r.as_ref().to_owned()),
+                                    _ => Ok(eval_body),
+                                }
+                            }
+                            _ => Err(anyhow!("Not a function")),
+                        }
+
+                        // eval the body with the extended_env
+                        // Ok(func)
                     }
                     _ => Ok(Object::Null),
                 },
