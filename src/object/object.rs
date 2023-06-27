@@ -1,18 +1,45 @@
 use std::collections::HashMap;
 use std::fmt::Display;
 
-use crate::ast::ast::{BlockStatement, Expression, Statement};
+use crate::ast::ast::{BlockStatement, Expression, Identifier, Statement};
 use crate::lexer::lexer::Token;
 use anyhow::{anyhow, Ok, Result};
 
 pub struct Environment {
     pub store: HashMap<String, Object>,
+    pub outer_env: Option<Box<Environment>>,
 }
 
 impl Environment {
     pub fn new() -> Self {
         Environment {
             store: HashMap::new(),
+            outer_env: None,
+        }
+    }
+    pub fn new_enclosed_environment(&self) -> Self {
+        Environment {
+            store: HashMap::new(),
+            outer_env: Some(Box::new(*self.clone())),
+        }
+    }
+    pub fn get(&self, name: &String) -> Result<Object> {
+        let obj = self.store.get(name);
+        match obj {
+            Some(o) => return Ok(o.to_owned()),
+            None => {
+                if let Some(outer) = self.outer_env {
+                    let object = outer.store.get(name);
+                    match object {
+                        Some(o) => Ok(o.to_owned()),
+                        None => Err(anyhow!(
+                            "Error: Object does not exist in inner or outer environment"
+                        )),
+                    }
+                } else {
+                    Err(anyhow!("Error: Object not in env and no outer env exists"))
+                }
+            }
         }
     }
 }
@@ -28,8 +55,13 @@ pub enum Object {
 }
 #[derive(PartialEq, Clone, Debug)]
 pub struct FunctionObject {
-    pub parameters: Vec<Expression>,
+    pub parameters: Option<Vec<Identifier>>,
     pub body: BlockStatement,
+}
+impl FunctionObject {
+    pub fn new(parameters: Option<Vec<Identifier>>, body: BlockStatement) -> Self {
+        FunctionObject { parameters, body }
+    }
 }
 
 impl Display for Object {
@@ -143,9 +175,19 @@ impl Object {
                         }
                         _ => Err(anyhow!("Wrong token type for identifier")),
                     },
-                    // Expression::Fn(func) => {},
+                    Expression::Fn(func) => Ok(Object::Function(FunctionObject::new(
+                        func.parameters,
+                        func.body,
+                    ))),
                     Expression::Call(call) => {
                         let func = Object::eval(vec![Statement::Expression(call.function)], env);
+                        let args: Vec<Object> = vec![];
+                        if let Some(arguments) = call.arguments {
+                            for arg in arguments.into_iter() {
+                                let eval = Object::eval(vec![Statement::Expression(arg)], env);
+                                args.push(eval)
+                            }
+                        }
                         Ok(func)
                     }
                     _ => Ok(Object::Null),
