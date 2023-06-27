@@ -79,13 +79,17 @@ impl Display for Object {
 }
 
 impl Object {
-    pub fn eval(nodes: Vec<Statement>, env: &Environment) -> Self {
+    pub fn eval(nodes: Vec<Statement>, env: &mut Environment) -> Self {
         let mut result: Result<Object> = Ok(Object::Null);
         for node in nodes.into_iter() {
             result = match node {
                 Statement::Let(l) => {
                     let val = Object::eval(vec![Statement::Expression(l.value)], env);
-                    Err(anyhow!("Todo"))
+                    match l.token {
+                        Token::Ident(s) => env.store.insert(s, val.clone()),
+                        _ => panic!("Wrong token here"),
+                    };
+                    Ok(val)
                 }
                 Statement::Return(r) => {
                     let val = Object::eval(vec![Statement::Expression(r.return_value)], env);
@@ -171,7 +175,7 @@ impl Object {
                             let val = env.store.get(&s);
                             //TODO: needs to be extended to assign new ident into env
                             match val {
-                                Some(v) => Ok(Object::Null),
+                                Some(v) => Ok(v.to_owned()),
                                 None => Err(anyhow!("Ident value does not already exist.")),
                             }
                         }
@@ -186,6 +190,7 @@ impl Object {
                         let func = Object::eval(vec![Statement::Expression(call.function)], env);
                         // turn arguments into objects
                         let mut args: Vec<Object> = vec![];
+                        println!("This is the args: {:?}", call.arguments);
                         if let Some(arguments) = call.arguments {
                             for arg in arguments.into_iter() {
                                 let eval = Object::eval(vec![Statement::Expression(arg)], env);
@@ -202,13 +207,14 @@ impl Object {
                                     for (i, param) in params.into_iter().enumerate() {
                                         match param.token {
                                             Token::Ident(s) => {
+                                                println!("this is the index: {}", i);
                                                 extended_env.store.insert(s, args[i].to_owned());
                                             }
                                             _ => todo!(),
                                         }
                                     }
                                 }
-                                let eval_body = Object::eval(f.body.statements, &extended_env);
+                                let eval_body = Object::eval(f.body.statements, &mut extended_env);
                                 match eval_body {
                                     Object::Return(r) => Ok(r.as_ref().to_owned()),
                                     _ => Ok(eval_body),
@@ -216,9 +222,6 @@ impl Object {
                             }
                             _ => Err(anyhow!("Not a function")),
                         }
-
-                        // eval the body with the extended_env
-                        // Ok(func)
                     }
                     _ => Ok(Object::Null),
                 },
@@ -249,24 +252,28 @@ mod test {
 
     use super::Environment;
 
-    // #[test]
-    // fn test_function_object() {
-    //     struct Test {
-    //         input: Vec<u8>,
-    //         parameters: Vec<Expression>,
-    //         expected: Object,
-    //     }
-    //     let tests = vec![Test {
-    //         input: "fn(x) {x+2};".into(),
-    //         parameters: vec![Expression::]
-    //         expected: Object::Return(Box::new(Object::Integer(15))),
-    //     }];
-    //
-    //     for test in tests.into_iter() {
-    //         let evaluated = test_eval(test.input);
-    //         assert_eq!(test.expected, evaluated);
-    //     }
-    // }
+    #[test]
+    fn test_function() {
+        struct Test {
+            input: Vec<u8>,
+            expected: Object,
+        }
+        let tests = vec![
+            Test {
+                input: "let identity = fn(x){x}; identity(5);".into(),
+                expected: Object::Integer(5),
+            },
+            Test {
+                input: "let add = fn(x,y){x+y;}; add(5+5, add(5,5));".into(),
+                expected: Object::Integer(20),
+            },
+        ];
+
+        for test in tests.into_iter() {
+            let evaluated = test_eval(test.input);
+            assert_eq!(test.expected, evaluated);
+        }
+    }
     #[test]
     fn test_let_statements() {
         struct Test {
@@ -276,19 +283,19 @@ mod test {
         let tests = vec![
             Test {
                 input: "let a = 5; a;".into(),
-                expected: Object::Let(Box::new(Object::Integer(10))),
+                expected: Object::Integer(5),
             },
             Test {
                 input: "let a = 5*5; a;".into(),
-                expected: Object::Let(Box::new(Object::Integer(25))),
+                expected: Object::Integer(25),
             },
             Test {
                 input: "let a =5; let b = a; b".into(),
-                expected: Object::Let(Box::new(Object::Integer(5))),
+                expected: Object::Integer(5),
             },
             Test {
                 input: "let a =5; let b =a; let c= a+b+5;".into(),
-                expected: Object::Return(Box::new(Object::Integer(15))),
+                expected: Object::Integer(15),
             },
         ];
 
@@ -555,8 +562,8 @@ mod test {
         let lex = Lexer::new(input);
         let mut parser = Parser::new(lex);
         let program = parser.parse_program().unwrap();
-        let env = Environment::new();
+        let mut env = Environment::new();
 
-        return Object::eval(program.statements, &env);
+        return Object::eval(program.statements, &mut env);
     }
 }

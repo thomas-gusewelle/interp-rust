@@ -24,7 +24,7 @@ pub fn start() {
             continue;
         }
 
-        let eval = Object::eval(program.statements, &Environment::new());
+        let eval = Object::eval(program.statements, &mut Environment::new());
 
         println!("{}", eval);
     }
