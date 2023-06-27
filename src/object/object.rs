@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::fmt::Display;
 
-use crate::ast::ast::{Expression, Statement};
+use crate::ast::ast::{BlockStatement, Expression, Statement};
 use crate::lexer::lexer::Token;
 use anyhow::{anyhow, Ok, Result};
 
@@ -24,6 +24,12 @@ pub enum Object {
     Null,
     Return(Box<Object>),
     Let(Box<Object>),
+    Function(FunctionObject),
+}
+#[derive(PartialEq, Clone, Debug)]
+pub struct FunctionObject {
+    pub parameters: Vec<Expression>,
+    pub body: BlockStatement,
 }
 
 impl Display for Object {
@@ -34,6 +40,7 @@ impl Display for Object {
             Object::Null => write!(f, "Null value"),
             Object::Return(o) => write!(f, "Return value: {}", o),
             Object::Let(l) => write!(f, "Let Value: {}", l),
+            Object::Function(func) => write!(f, "Function Value: {:?}", func),
         };
     }
 }
@@ -41,7 +48,7 @@ impl Display for Object {
 impl Object {
     pub fn eval(nodes: Vec<Statement>, env: &Environment) -> Self {
         let mut result: Result<Object> = Ok(Object::Null);
-        'stacks: for node in nodes.into_iter() {
+        for node in nodes.into_iter() {
             result = match node {
                 Statement::Let(l) => {
                     let val = Object::eval(vec![Statement::Expression(l.value)], env);
@@ -125,6 +132,22 @@ impl Object {
                             Ok(Object::Null)
                         }
                     }
+                    Expression::Identifier(i) => match i {
+                        Token::Ident(s) => {
+                            let val = env.store.get(&s);
+                            //TODO: needs to be extended to assign new ident into env
+                            match val {
+                                Some(v) => Ok(Object::Null),
+                                None => Err(anyhow!("Ident value does not already exist.")),
+                            }
+                        }
+                        _ => Err(anyhow!("Wrong token type for identifier")),
+                    },
+                    // Expression::Fn(func) => {},
+                    Expression::Call(call) => {
+                        let func = Object::eval(vec![Statement::Expression(call.function)], env);
+                        Ok(func)
+                    }
                     _ => Ok(Object::Null),
                 },
             };
@@ -147,12 +170,31 @@ impl Object {
 
 #[cfg(test)]
 mod test {
+    use crate::ast::ast::Expression;
     use crate::lexer::lexer::Lexer;
     use crate::object::object::Object;
     use crate::parser::parser::Parser;
 
     use super::Environment;
 
+    // #[test]
+    // fn test_function_object() {
+    //     struct Test {
+    //         input: Vec<u8>,
+    //         parameters: Vec<Expression>,
+    //         expected: Object,
+    //     }
+    //     let tests = vec![Test {
+    //         input: "fn(x) {x+2};".into(),
+    //         parameters: vec![Expression::]
+    //         expected: Object::Return(Box::new(Object::Integer(15))),
+    //     }];
+    //
+    //     for test in tests.into_iter() {
+    //         let evaluated = test_eval(test.input);
+    //         assert_eq!(test.expected, evaluated);
+    //     }
+    // }
     #[test]
     fn test_let_statements() {
         struct Test {
