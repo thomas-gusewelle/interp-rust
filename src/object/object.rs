@@ -58,10 +58,19 @@ pub enum Object {
 pub struct FunctionObject {
     pub parameters: Option<Vec<Identifier>>,
     pub body: BlockStatement,
+    pub environment: Environment,
 }
 impl FunctionObject {
-    pub fn new(parameters: Option<Vec<Identifier>>, body: BlockStatement) -> Self {
-        FunctionObject { parameters, body }
+    pub fn new(
+        parameters: Option<Vec<Identifier>>,
+        body: BlockStatement,
+        environment: Environment,
+    ) -> Self {
+        FunctionObject {
+            parameters,
+            body,
+            environment,
+        }
     }
 }
 
@@ -84,7 +93,10 @@ impl Object {
         for node in nodes.into_iter() {
             result = match node {
                 Statement::Let(l) => {
+                    // println!("This is the val: {:?}", l);
+
                     let val = Object::eval(vec![Statement::Expression(l.value)], env);
+                    // println!("Eval value: {:?}", val);
                     match l.token {
                         Token::Ident(s) => env.store.insert(s, val.clone()),
                         _ => panic!("Wrong token here"),
@@ -171,22 +183,17 @@ impl Object {
                         }
                     }
                     Expression::Identifier(i) => match i {
-                        Token::Ident(s) => {
-                            let val = env.store.get(&s);
-                            //TODO: needs to be extended to assign new ident into env
-                            match val {
-                                Some(v) => Ok(v.to_owned()),
-                                None => {
-                                    Err(anyhow!("Ident value does not already exist. Got: {}", s))
-                                }
-                            }
-                        }
+                        Token::Ident(s) => env.get(&s),
                         _ => Err(anyhow!("Wrong token type for identifier")),
                     },
-                    Expression::Fn(func) => Ok(Object::Function(FunctionObject::new(
-                        func.parameters,
-                        func.body,
-                    ))),
+                    Expression::Fn(func) => {
+                        let clone_env = env.clone();
+                        Ok(Object::Function(FunctionObject::new(
+                            func.parameters,
+                            func.body,
+                            clone_env,
+                        )))
+                    }
                     Expression::Call(call) => {
                         // Get function from call
                         let func = Object::eval(vec![Statement::Expression(call.function)], env);
@@ -200,15 +207,17 @@ impl Object {
                         }
 
                         //apply the fucntion
-                        let mut extended_env = env.new_enclosed_environment();
                         match func {
                             Object::Function(f) => {
+                                let mut extended_env = f.environment.new_enclosed_environment();
                                 // gets the params from function and adds the idents to extended_env
                                 if let Some(params) = f.parameters {
                                     for (i, param) in params.into_iter().enumerate() {
                                         match param.token {
                                             Token::Ident(s) => {
-                                                extended_env.store.insert(s, args[i].to_owned());
+                                                extended_env
+                                                    .store
+                                                    .insert(s.clone(), args[i].to_owned());
                                             }
                                             _ => todo!(),
                                         }
@@ -222,8 +231,7 @@ impl Object {
                             }
                             _ => Err(anyhow!("Not a function")),
                         }
-                    }
-                    _ => Ok(Object::Null),
+                    } // _ => Ok(Object::Null),
                 },
             };
         }
@@ -245,7 +253,6 @@ impl Object {
 
 #[cfg(test)]
 mod test {
-    use crate::ast::ast::Expression;
     use crate::lexer::lexer::Lexer;
     use crate::object::object::Object;
     use crate::parser::parser::Parser;
