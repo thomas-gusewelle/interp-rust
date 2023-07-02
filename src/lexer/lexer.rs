@@ -8,6 +8,7 @@ pub enum Token {
 
     Ident(String),
     Int(isize),
+    String(String),
 
     Assign,
     Plus,
@@ -45,6 +46,7 @@ impl Display for Token {
 
             Token::Ident(s) => write!(f, "Ident: {}", s),
             Token::Int(s) => write!(f, "Int: {}", s),
+            Token::String(s) => write!(f, "String: {}", s),
 
             Token::Assign => write!(f, "Assign"),
             Token::Plus => write!(f, "Plus"),
@@ -128,6 +130,10 @@ impl Lexer {
             b'<' => Token::LessThan,
             b'>' => Token::GreaterThan,
             0 => Token::EOF,
+            b'\'' | b'"' => {
+                let string = self.read_string();
+                return Token::String(string);
+            }
             b'a'..=b'z' | b'A'..=b'Z' | b'_' => {
                 let ident: String = self.read_indetifier();
                 return self.look_up_ident(ident);
@@ -176,6 +182,16 @@ impl Lexer {
         }
         let buf = &self.input[position..self.position];
         return String::from_utf8_lossy(buf).into_owned();
+    }
+
+    fn read_string(&mut self) -> String {
+        self.read_char();
+        let position = self.position;
+        while self.ch != b'\'' && self.ch != b'"' {
+            println!("Char is: {}", self.ch);
+            self.read_char();
+        }
+        String::from_utf8_lossy(&self.input[position..self.position]).into_owned()
     }
 
     fn skip_whitespace(&mut self) {
@@ -227,6 +243,7 @@ mod tests {
 }
 10 == 10;
 10 != 9;
+"Hello World";
             "#;
         let mut lexer = Lexer::new(input.into());
 
@@ -304,6 +321,7 @@ mod tests {
             Token::NotEqual,
             Token::Int(9),
             Token::Semicolon,
+            Token::String(String::from("Hello World")),
         ];
 
         for token in tokens.into_iter() {
