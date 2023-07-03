@@ -10,7 +10,7 @@ pub enum Statement {
 pub enum Expression {
     Identifier(Token),
     Integer(Token),
-    String(Token),
+    String(String),
     Boolean(Token),
     Prefix(Box<PrefixExpression>),
     Infix(Box<InfixExpression>),

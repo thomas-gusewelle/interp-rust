@@ -187,11 +187,12 @@ impl Lexer {
     fn read_string(&mut self) -> String {
         self.read_char();
         let position = self.position;
-        while self.ch != b'\'' && self.ch != b'"' {
-            println!("Char is: {}", self.ch);
+        while self.ch != b'\'' && self.ch != b'"' && self.ch != 0 {
             self.read_char();
         }
-        String::from_utf8_lossy(&self.input[position..self.position]).into_owned()
+        let end_postition = self.position;
+        self.read_char();
+        String::from_utf8_lossy(&self.input[position..end_postition]).into_owned()
     }
 
     fn skip_whitespace(&mut self) {
@@ -226,7 +227,7 @@ mod tests {
     use super::{Lexer, Token};
     #[test]
     fn test_string_token() -> Result<()> {
-        let input: Vec<u8> = ""Hello World";".into();
+        let input: Vec<u8> = r#""Hello World""#.into();
 
         let mut lex = Lexer::new(input);
         let tokens = vec![Token::String(String::from("Hello World"))];
