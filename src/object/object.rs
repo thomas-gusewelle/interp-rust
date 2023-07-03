@@ -162,6 +162,10 @@ impl Object {
                                 Token::NotEqual => Ok(Object::Boolean(bl != br)),
                                 _ => Err(anyhow!("Wrong opertor for infix")),
                             },
+                            (Object::String(sl), Object::String(sr)) => match inf.token {
+                                Token::Plus => Ok(Object::String(sl + &sr)),
+                                _ => Err(anyhow!("Wrong operator used to concatinate strings")),
+                            },
                             _ => Err(anyhow!("Wrong token type in infix")),
                         }
                     }
