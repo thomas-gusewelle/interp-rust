@@ -224,7 +224,20 @@ mod tests {
     use anyhow::Result;
 
     use super::{Lexer, Token};
+    #[test]
+    fn test_string_token() -> Result<()> {
+        let input: Vec<u8> = ""Hello World";".into();
 
+        let mut lex = Lexer::new(input);
+        let tokens = vec![Token::String(String::from("Hello World"))];
+
+        for token in tokens.into_iter() {
+            let tok = lex.next_token();
+            println!("Expected:  {:?}, Got: {:?}", token, tok);
+            assert_eq!(token, tok);
+        }
+        Ok(())
+    }
     #[test]
     fn test_next_token() -> Result<()> {
         let input = r#"let five = 5;

@@ -117,6 +117,7 @@ impl Object {
                             i
                         )),
                     },
+                    Expression::String(s) => todo!(),
                     Expression::Boolean(b) => match b {
                         Token::True => Ok(Object::Boolean(true)),
                         Token::False => Ok(Object::Boolean(false)),

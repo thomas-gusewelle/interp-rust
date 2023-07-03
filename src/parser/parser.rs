@@ -161,6 +161,7 @@ impl Parser {
         let mut expression = match &self.current_token {
             Token::Ident(_) => Ok(Expression::Identifier(self.current_token.clone())),
             Token::Int(_) => Ok(Expression::Integer(self.current_token.clone())),
+            Token::String(_) => Ok(Expression::String(self.current_token.clone())),
             Token::True | Token::False => Ok(Expression::Boolean(self.current_token.clone())),
             Token::Bang | Token::Minus => self.parse_prefix(),
             Token::LParen => {
@@ -470,6 +471,35 @@ mod tests {
                 Expression::Integer(t) => match t {
                     Token::Int(s) => {
                         assert_eq!(s.to_owned(), 5 as isize)
+                    }
+                    _ => todo!(),
+                },
+                _ => todo!(),
+            },
+            _ => println!("Other"),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_string_expression() -> Result<()> {
+        let input: Vec<u8> = "Hello World;".into();
+
+        let lex = Lexer::new(input);
+        let mut parser = Parser::new(lex);
+        let program = parser.parse_program().unwrap();
+        check_errors(parser.errors().clone());
+
+        if program.statements.len() != 1 {
+            println!("Statements: {:?}", program.statements);
+            return Err(anyhow!("Wrong number of statements"));
+        };
+
+        match &program.statements[0] {
+            Statement::Expression(exp) => match exp {
+                Expression::String(t) => match t {
+                    Token::String(s) => {
+                        assert_eq!(s.to_owned(), String::from("Hello World"))
                     }
                     _ => todo!(),
                 },
