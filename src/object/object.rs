@@ -54,6 +54,7 @@ pub enum Object {
     Return(Box<Object>),
     Let(Box<Object>),
     Function(FunctionObject),
+    BuiltinFunction(fn()),
 }
 #[derive(PartialEq, Clone, Debug)]
 pub struct FunctionObject {
@@ -85,6 +86,7 @@ impl Display for Object {
             Object::Return(o) => write!(f, "Return value: {}", o),
             Object::Let(l) => write!(f, "Let Value: {}", l),
             Object::Function(func) => write!(f, "Function Value: {:?}", func),
+            Object::BuiltinFunction(bf) => write!(f, "Builtin Function: {:?}", bf),
         };
     }
 }
