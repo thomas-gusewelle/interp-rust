@@ -3,10 +3,12 @@ use std::fmt::Display;
 
 use crate::ast::ast::{BlockStatement, Expression, Identifier, Statement};
 use crate::lexer::lexer::Token;
+use crate::parser::builtin_functions::{self, BuiltinFunctions};
 use anyhow::{anyhow, Ok, Result};
 
 #[derive(PartialEq, Clone, Debug)]
 pub struct Environment {
+    pub builtin_functions: BuiltinFunctions,
     pub store: HashMap<String, Object>,
     pub outer_env: Option<Box<Environment>>,
 }
@@ -14,12 +16,14 @@ pub struct Environment {
 impl Environment {
     pub fn new() -> Self {
         Environment {
+            builtin_functions: BuiltinFunctions::setup(),
             store: HashMap::new(),
             outer_env: None,
         }
     }
     pub fn new_enclosed_environment(&self) -> Self {
         Environment {
+            builtin_functions: self.builtin_functions.clone(),
             store: HashMap::new(),
             outer_env: Some(Box::new(self.to_owned())),
         }
@@ -29,16 +33,21 @@ impl Environment {
         match obj {
             Some(o) => return Ok(o.to_owned()),
             None => {
-                if let Some(outer) = &self.outer_env {
-                    let object = outer.store.get(name);
-                    match object {
-                        Some(o) => Ok(o.to_owned()),
-                        None => Err(anyhow!(
-                            "Error: Object does not exist in inner or outer environment"
-                        )),
-                    }
+                let env_check = if let Some(outer) = &self.outer_env {
+                    outer.store.get(name)
                 } else {
-                    Err(anyhow!("Error: Object not in env and no outer env exists"))
+                    None
+                };
+
+                match env_check {
+                    Some(e) => Ok(e.to_owned()),
+                    None => {
+                        let builtin_check = self.builtin_functions.get_fn(name.to_owned());
+                        match builtin_check {
+                            Some(b) => Ok(Object::BuiltinFunction(b)),
+                            None => Err(anyhow!("Not found in builtin_functions")),
+                        }
+                    }
                 }
             }
         }
@@ -54,7 +63,7 @@ pub enum Object {
     Return(Box<Object>),
     Let(Box<Object>),
     Function(FunctionObject),
-    BuiltinFunction(fn()),
+    BuiltinFunction(fn(Option<Vec<Object>>) -> Result<Object>),
 }
 #[derive(PartialEq, Clone, Debug)]
 pub struct FunctionObject {
@@ -238,6 +247,7 @@ impl Object {
                                     _ => Ok(eval_body),
                                 }
                             }
+                            Object::BuiltinFunction(bf) => bf(Some(args)),
                             _ => Err(anyhow!("Not a function")),
                         }
                     } // _ => Ok(Object::Null),
@@ -267,6 +277,23 @@ mod test {
     use crate::parser::parser::Parser;
 
     use super::Environment;
+
+    #[test]
+    fn test_builtin() {
+        struct Test {
+            input: Vec<u8>,
+            expected: Object,
+        }
+        let tests = vec![Test {
+            input: r#"len("four")"#.into(),
+            expected: Object::Integer(4),
+        }];
+
+        for test in tests.into_iter() {
+            let evaluated = test_eval(test.input);
+            assert_eq!(test.expected, evaluated);
+        }
+    }
 
     #[test]
     fn test_closures() {
