@@ -28,6 +28,8 @@ pub enum Token {
     RParen,
     LBrace,
     RBrace,
+    LBracket,
+    RBracket,
 
     Function,
     Let,
@@ -66,6 +68,8 @@ impl Display for Token {
             Token::RParen => write!(f, "Right Paran"),
             Token::LBrace => write!(f, "Left Brace"),
             Token::RBrace => write!(f, "Right Brace"),
+            Token::LBracket => write!(f, "Left Bracket"),
+            Token::RBracket => write!(f, "Right Bracket"),
 
             Token::Function => write!(f, "Function"),
             Token::Let => write!(f, "Let"),
@@ -116,6 +120,8 @@ impl Lexer {
             b'+' => Token::Plus,
             b'{' => Token::LBrace,
             b'}' => Token::RBrace,
+            b'[' => Token::LBracket,
+            b']' => Token::RBracket,
             b'!' => {
                 if self.peek_char() == b'=' {
                     self.read_char();
@@ -258,6 +264,7 @@ mod tests {
 10 == 10;
 10 != 9;
 "Hello World";
+[1,2];
             "#;
         let mut lexer = Lexer::new(input.into());
 
@@ -336,6 +343,13 @@ mod tests {
             Token::Int(9),
             Token::Semicolon,
             Token::String(String::from("Hello World")),
+            Token::Semicolon,
+            Token::LBracket,
+            Token::Int(1),
+            Token::Comma,
+            Token::Int(2),
+            Token::RBracket,
+            Token::Semicolon,
         ];
 
         for token in tokens.into_iter() {
