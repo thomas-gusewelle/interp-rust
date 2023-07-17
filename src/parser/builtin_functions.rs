@@ -1,5 +1,5 @@
 use ::anyhow::Result;
-use anyhow::anyhow;
+use anyhow::{anyhow, Ok};
 use std::collections::HashMap;
 
 use crate::object::object::Object;
@@ -28,7 +28,10 @@ impl BuiltinFunctions {
 
 fn len(arguments: Option<Vec<Object>>) -> Result<Object> {
     if let Some(args) = arguments {
-        Ok(Object::Null)
+        match &args[0] {
+            Object::String(s) => Ok(Object::Integer(s.len() as isize)),
+            _ => Err(anyhow!("Wrong argument type for len function.")),
+        }
     } else {
         Err(anyhow!("Argument must be suplied"))
     }
