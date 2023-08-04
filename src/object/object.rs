@@ -136,6 +136,8 @@ impl Object {
                         Token::False => Ok(Object::Boolean(false)),
                         _ => Err(anyhow!("Wrong token type. Expected Boolean, Got: {:?}", b)),
                     },
+                    // TODO: finish eval into object
+                    Expression::Array(a) => Ok(Object::Null),
                     Expression::Prefix(p) => {
                         let right = Object::eval(vec![Statement::Expression(p.right)], env);
                         match &p.token {

@@ -173,6 +173,29 @@ impl Parser {
                 };
                 expression
             }
+            Token::LBracket => {
+                let mut array_items: Vec<Expression> = vec![];
+
+                if self.peek_token_is(Token::RBracket) {
+                    self.next_token();
+                    return Ok(Expression::Array(array_items));
+                };
+
+                self.next_token();
+                array_items.push(self.parse_expression(Precidence::Lowest).unwrap());
+
+                while self.peek_token_is(Token::Comma) {
+                    self.next_token();
+                    self.next_token();
+
+                    array_items.push(self.parse_expression(Precidence::Lowest).unwrap())
+                }
+
+                if !self.expect_peek_and_skip_token(Token::RBracket) {
+                    return Err(anyhow!("Expected closing bracket for array."));
+                };
+                return Ok(Expression::Array(array_items));
+            }
             Token::If => {
                 let token = self.current_token.clone();
 
@@ -362,6 +385,51 @@ mod tests {
     }
 
     use super::Parser;
+
+    #[test]
+    fn test_array_parse() -> Result<()> {
+        let input: Vec<u8> = r#"[1, 2 *2, 3+3]"#.into();
+        let lexer = Lexer::new(input.into());
+        let mut parser = Parser::new(lexer);
+        check_errors(parser.errors.clone());
+
+        let program = parser.parse_program().unwrap();
+        if program.statements.len() != 1 {
+            return Err(anyhow!("not right number of statments"));
+        }
+
+        println!("{:?}", program.statements[0]);
+
+        let expected = vec![
+            Expression::Integer(Token::Int(1)),
+            Expression::Infix(Box::new(InfixExpression::new(
+                Expression::Integer(Token::Int(2)),
+                Token::Asterisk,
+                Expression::Integer(Token::Int(2)),
+            ))),
+            Expression::Infix(Box::new(InfixExpression::new(
+                Expression::Integer(Token::Int(3)),
+                Token::Plus,
+                Expression::Integer(Token::Int(3)),
+            ))),
+        ];
+
+        for (i, expression) in expected.iter().enumerate() {
+            let statement = &program.statements[0];
+            match statement {
+                Statement::Expression(ex) => match ex {
+                    Expression::Array(a) => {
+                        assert_eq!(a.get(i).unwrap(), expression)
+                    }
+                    _ => todo!(),
+                },
+                _ => todo!(),
+            };
+        }
+
+        Ok(())
+    }
+
     #[test]
     fn test_let_statment() -> Result<()> {
         let input = r#"

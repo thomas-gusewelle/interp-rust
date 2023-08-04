@@ -17,6 +17,7 @@ pub enum Expression {
     If(Box<IfExpression>),
     Fn(Box<FnExpression>),
     Call(Box<CallExpression>),
+    Array(Vec<Expression>),
 }
 
 #[derive(Debug, PartialEq)]
